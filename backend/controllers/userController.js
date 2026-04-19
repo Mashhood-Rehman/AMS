@@ -3,7 +3,7 @@ import { prisma } from '../db.js';
 
 // Create User (Admin/Teacher creates student/user)
 export const createUser = async (req, res) => {
-  const { email, password, name, role } = req.body;
+  const { email, password, name, role, phone, status, courseIds } = req.body;
 
   try {
     // Basic validation
@@ -32,8 +32,14 @@ export const createUser = async (req, res) => {
         email,
         password: hashedPassword,
         name,
+        phone,
+        status: status || 'ACTIVE',
         role: (role || 'STUDENT').toUpperCase(),
+        taughtCourses: role === 'TEACHER' && courseIds ? {
+          connect: courseIds.map(id => ({ id: parseInt(id) }))
+        } : undefined
       },
+      include: { taughtCourses: true }
     });
 
     res.status(201).json({
@@ -49,7 +55,7 @@ export const createUser = async (req, res) => {
 // Edit User
 export const updateUser = async (req, res) => {
   const { id } = req.params;
-  const { email, password, name, role } = req.body;
+  const { email, password, name, role, phone, status, courseIds } = req.body;
 
   try {
     // Check if user exists
@@ -68,8 +74,17 @@ export const updateUser = async (req, res) => {
     const updateData = {
       email: email || targetUser.email,
       name: name || targetUser.name,
+      phone: phone !== undefined ? phone : targetUser.phone,
+      status: status || targetUser.status,
       role: role ? role.toUpperCase() : targetUser.role,
     };
+
+    // Update teacher courses if role is TEACHER
+    if (updateData.role === 'TEACHER' && courseIds) {
+      updateData.taughtCourses = {
+        set: courseIds.map(id => ({ id: parseInt(id) }))
+      };
+    }
 
     // Hash new password if provided
     if (password) {
@@ -104,7 +119,12 @@ export const getAllUsers = async (req, res) => {
         id: true,
         email: true,
         name: true,
+        phone: true,
         role: true,
+        status: true,
+        taughtCourses: {
+          select: { id: true, name: true, code: true }
+        },
         createdAt: true,
         updatedAt: true
       },
