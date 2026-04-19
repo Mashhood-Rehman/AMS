@@ -7,6 +7,9 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import UsersList from './pages/UserLogs/UsersList';
 import AddUser from './pages/UserLogs/AddUser';
+import Courses from './pages/Courses/Courses';
+import CoursesList from './pages/Courses/CoursesList';
+import AddCourse from './pages/Courses/AddCourse';
 
 // Placeholder components for other routes
 const Attendance = () => <div className="stat-card"><h2>Attendance Management</h2><p>Feature coming soon...</p></div>;
@@ -39,9 +42,15 @@ function App() {
               <Route path="add-user" element={<AddUser />} />
               <Route path="edit-user/:id" element={<AddUser />} />
             </Route>
+
+            <Route path="courses" element={<Courses />} >
+              <Route index element={<Navigate to="courses-list" replace />} />
+              <Route path="courses-list" element={<CoursesList />} />
+              <Route path="add-course" element={<AddCourse />} />
+              <Route path="edit-course/:id" element={<AddCourse />} />
+            </Route>
           </Route>
 
-          {/* Fallback - Redirect to login (index) */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

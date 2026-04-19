@@ -5,13 +5,23 @@ import {
   ClipboardCheck,
   FileText,
   Settings,
-  History
+  History,
+  BookOpen
 } from 'lucide-react';
 
 export const navItems = [
   { title: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
   { title: 'Attendance', icon: <ClipboardCheck size={20} />, path: '/dashboard/attendance' },
   { title: 'Students', icon: <Users size={20} />, path: '/dashboard/students' },
+  {
+    title: 'Courses',
+    icon: <BookOpen size={20} />,
+    path: '/dashboard/courses',
+    subTabs: [
+      { title: 'Courses List', path: '/dashboard/courses/courses-list' },
+      { title: 'Add Course', path: '/dashboard/courses/add-course' },
+    ]
+  },
   { title: 'Reports', icon: <FileText size={20} />, path: '/dashboard/reports' },
   { title: 'Settings', icon: <Settings size={20} />, path: '/dashboard/settings' },
   {

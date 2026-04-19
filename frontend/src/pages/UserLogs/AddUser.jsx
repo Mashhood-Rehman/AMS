@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  ArrowLeft, 
-  Save, 
-  User, 
-  Mail, 
-  Phone, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  ShieldCheck, 
+import {
+  ArrowLeft,
+  Save,
+  User,
+  Mail,
+  Phone,
+  Lock,
+  Eye,
+  EyeOff,
+  ShieldCheck,
   BookOpen,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  XCircle,
+  Users
 } from 'lucide-react';
-import CustomHeader from '../../components/constantComponents/CustomHeader';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import { toast } from 'react-toastify';
 
@@ -36,7 +37,7 @@ const AddUser = () => {
 
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(false);
+  const [fetching, setFetching] = useState(isEditMode);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -119,7 +120,7 @@ const AddUser = () => {
         : `http://localhost:5000/api/users`;
 
       const method = isEditMode ? 'put' : 'post';
-      
+
       const payload = { ...formData };
       if (isEditMode && !payload.password) delete payload.password;
       if (payload.role !== 'TEACHER') delete payload.courseIds;
@@ -153,35 +154,61 @@ const AddUser = () => {
 
   if (fetching) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500 gap-3">
-        <Loader2 className="animate-spin text-brand-active" size={40} />
-        <p className="font-medium">Fetching User Details...</p>
+      <div className="flex flex-col items-center justify-center py-20 gap-4 animate-fade-in">
+        <Loader2 size={40} className="animate-spin text-brand-active" />
+        <p className="text-slate-500 font-medium">Fetching User Details...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-12">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Add User Account</h1>
-          <p className="text-slate-500 mt-2">Create a new system user and assign appropriate roles and permissions.</p>
+    <div className="max-w-5xl mx-auto animate-fade-in pb-8">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between mb-6 px-1">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-50 text-brand-active rounded-2xl flex items-center justify-center shadow-inner">
+            <Users size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              {isEditMode ? 'Update User Account' : 'Register New User'}
+            </h1>
+            <p className="text-sm text-slate-500 font-medium tracking-tight">Configure profile, roles and access levels.</p>
+          </div>
         </div>
-        <button 
+        <button
           onClick={() => navigate('/dashboard/user-logs/users-list')}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#F2EDE7] text-slate-700 rounded-xl font-semibold hover:bg-[#EAE2D8] transition-colors border border-[#E0D6C8]"
+          className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-[0.98]"
         >
           <ArrowLeft size={18} />
-          Back to Users List
+          Back to list
         </button>
       </div>
 
-      <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
-        <form onSubmit={handleSubmit} className="p-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Type/Role Selection */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-700">Type <span className="text-red-500">*</span></label>
+      <div className="bg-white rounded-[2rem] border-0 p-1">
+        <form onSubmit={handleSubmit} className="space-y-4 p-4 md:p-6 bg-slate-50/30 rounded-3xl border border-slate-100">
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+            {/* Full Name */}
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-sm font-bold text-slate-700 ml-1">Full Name</label>
+              <div className="relative group">
+                <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                <input
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  type="text"
+                  placeholder="Full Name"
+                  className={`custom_input ${errors.name ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
+                />
+              </div>
+              {errors.name && <p className="text-xs text-red-500 font-bold pl-2">{errors.name}</p>}
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-1">
+              <label className="block text-sm font-bold text-slate-700 ml-1">System Role</label>
               <SearchableDropdown
                 options={roleOptions}
                 value={formData.role}
@@ -190,91 +217,26 @@ const AddUser = () => {
               />
             </div>
 
-            {/* Full Name */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-700">Full Name <span className="text-red-500">*</span></label>
-              <div className="relative group">
-                <User size={18} className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-brand-active transition-colors" />
-                <input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  type="text"
-                  placeholder="Full Name"
-                  className={`w-full pl-12 pr-4 py-3 bg-white border rounded-xl outline-none transition-all shadow-sm
-                    ${errors.name ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:border-brand-active focus:ring-4 focus:ring-brand-active/10 hover:border-slate-300'}
-                  `}
-                />
-              </div>
-              {errors.name && <p className="text-xs text-red-500 font-medium pl-1">{errors.name}</p>}
-            </div>
-
             {/* Email */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-700">Email <span className="text-red-500">*</span></label>
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-sm font-bold text-slate-700 ml-1">Email Address</label>
               <div className="relative group">
-                <Mail size={18} className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors transition-colors" />
                 <input
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
                   type="email"
-                  placeholder="Email"
-                  className={`w-full pl-12 pr-4 py-3 bg-white border rounded-xl outline-none transition-all shadow-sm
-                    ${errors.email ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:border-brand-active focus:ring-4 focus:ring-brand-active/10 hover:border-slate-300'}
-                  `}
+                  placeholder="name@example.com"
+                  className={`custom_input ${errors.email ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                 />
               </div>
-              {errors.email && <p className="text-xs text-red-500 font-medium pl-1">{errors.email}</p>}
+              {errors.email && <p className="text-xs text-red-500 font-bold pl-2">{errors.email}</p>}
             </div>
 
-            {/* Phone Number */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-700">Phone Number</label>
-              <div className="relative group">
-                <Phone size={18} className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-brand-active transition-colors" />
-                <input
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  type="tel"
-                  placeholder="Phone Number"
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none transition-all shadow-sm focus:border-brand-active focus:ring-4 focus:ring-brand-active/10 hover:border-slate-300"
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-700">
-                {isEditMode ? "New Password" : "Password"} { !isEditMode && <span className="text-red-500">*</span>}
-              </label>
-              <div className="relative group">
-                <Lock size={18} className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-brand-active transition-colors" />
-                <input
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  type={showPassword ? "text" : "password"}
-                  placeholder={isEditMode ? "Leave blank to keep current" : "Password"}
-                  className={`w-full pl-12 pr-12 py-3 bg-white border rounded-xl outline-none transition-all shadow-sm
-                    ${errors.password ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:border-brand-active focus:ring-4 focus:ring-brand-active/10 hover:border-slate-300'}
-                  `}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.password && <p className="text-xs text-red-500 font-medium pl-1">{errors.password}</p>}
-            </div>
-
-            {/* Status Selection */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-700">Status <span className="text-red-500">*</span></label>
+             {/* Status Selection */}
+             <div className="space-y-1">
+              <label className="block text-sm font-bold text-slate-700 ml-1">Account Status</label>
               <SearchableDropdown
                 options={statusOptions}
                 value={formData.status}
@@ -282,36 +244,69 @@ const AddUser = () => {
                 placeholder="Select Status"
               />
             </div>
+
+            {/* Phone Number */}
+            <div className="space-y-1">
+              <label className="block text-sm font-bold text-slate-700 ml-1">Phone Number</label>
+              <div className="relative group">
+                <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                <input
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  type="tel"
+                  placeholder="+1 (555) 000-0000"
+                  className="custom_input"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-sm font-bold text-slate-700 ml-1">
+                {isEditMode ? "Reset Password (Optional)" : "Account Password"}
+              </label>
+              <div className="relative group">
+                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                <input
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  type={showPassword ? "text" : "password"}
+                  placeholder={isEditMode ? "Leave blank to keep current" : "Minimum 8 characters"}
+                  className={`custom_input pr-12 ${errors.password ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.password && <p className="text-xs text-red-500 font-bold pl-2">{errors.password}</p>}
+            </div>
           </div>
 
-          {/* Dynamic Teacher Permissions/Courses Section */}
+          {/* Teacher Assignment Section */}
           {formData.role === 'TEACHER' && (
-            <div className="mt-12 pt-8 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-brand-active/10 rounded-xl flex items-center justify-center text-brand-active">
-                    <BookOpen size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">Course Assignment</h3>
-                    <p className="text-sm text-slate-500">Assign specific courses that this teacher will manage.</p>
-                  </div>
+            <div className="mt-4 pt-6 border-t border-slate-200/50 animate-in fade-in slide-in-from-bottom-2 duration-400">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-indigo-50 text-brand-active rounded-xl">
+                  <BookOpen size={20} />
                 </div>
-                {formData.courseIds.length > 0 && (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
-                    <CheckCircle2 size={14} />
-                    {formData.courseIds.length} Courses Assigned
-                  </div>
-                )}
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 tracking-tight">Academic Assignments</h3>
+                  <p className="text-xs text-slate-500 font-medium">Select courses this teacher will be responsible for.</p>
+                </div>
               </div>
-              
-              <div className="max-w-xl">
+
+              <div className="max-w-2xl">
                 <SearchableDropdown
                   options={courses}
                   value={formData.courseIds}
                   onChange={(val) => setFormData(prev => ({ ...prev, courseIds: val }))}
-                  placeholder="Select Courses to Assign..."
-                  label="Search & Select Courses"
+                  placeholder="Search and select multiple courses..."
                   isMulti={true}
                   error={errors.courses}
                 />
@@ -320,23 +315,21 @@ const AddUser = () => {
           )}
 
           {/* Form Actions */}
-          <div className="mt-12 pt-8 border-t border-slate-100 flex items-center justify-end gap-4">
+          <div className="pt-6 mt-4 border-t border-slate-200/50 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => navigate('/dashboard/user-logs/users-list')}
-              className="px-8 py-3.5 text-slate-600 font-semibold hover:bg-slate-50 rounded-xl transition-colors"
+              className="px-6 py-2.5 text-slate-500 font-bold hover:text-slate-700 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className={`flex items-center gap-2 px-10 py-3.5 bg-brand-active text-white rounded-xl font-bold shadow-lg shadow-brand-active/20 hover:bg-brand-hover transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100
-                ${loading ? "cursor-not-allowed" : ""}
-              `}
+              className="flex items-center gap-2 px-10 py-3 bg-brand-dark text-white rounded-xl font-bold shadow-lg shadow-brand-dark/20 hover:bg-brand-hover active:scale-[0.98] transition-all disabled:opacity-70"
             >
-              {loading ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-              {isEditMode ? "Update Account" : "Save Account"}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              {isEditMode ? "Save Changes" : "Create User Account"}
             </button>
           </div>
         </form>

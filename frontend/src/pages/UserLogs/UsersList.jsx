@@ -48,9 +48,21 @@ const UsersList = () => {
   const tableHeaders = [
     { key: 'name', label: 'Full Name' },
     { key: 'email', label: 'Email' },
-    { key: 'role', label: 'Role' },
     { 
-      key: 'createdAt', 
+      key: 'role', 
+      label: 'Role',
+      render: (val) => (
+        <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${
+          val === 'ADMIN' ? 'bg-indigo-50 text-indigo-600' :
+          val === 'TEACHER' ? 'bg-amber-50 text-amber-600' :
+          'bg-emerald-50 text-emerald-600'
+        }`}>
+          {val}
+        </span>
+      )
+    },
+    {
+      key: 'createdAt',
       label: 'Joined Date',
       render: (val) => new Date(val).toLocaleDateString()
     },
@@ -59,14 +71,14 @@ const UsersList = () => {
       label: 'Actions',
       render: (_, item) => (
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={() => navigate(`/dashboard/user-logs/edit-user/${item.id}`)}
             className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-brand-active hover:text-white transition-all shadow-sm"
             title="Edit User"
           >
             <Icons.Pencil size={16} />
           </button>
-          <button 
+          <button
             onClick={() => handleDelete(item.id)}
             className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100"
             title="Delete User"
@@ -79,30 +91,37 @@ const UsersList = () => {
   ];
 
   return (
-    <div className="text-slate-800">
-      <CustomHeader 
-        title="Users List" 
-        subtitle="Manage and monitor system users and their access levels."
+    <div className="animate-fade-in">
+      <CustomHeader
+        title="Users Management"
+        subtitle="Manage system users, access levels, and role assignments."
         actions={
-          <button 
+          <button
             onClick={() => navigate('/dashboard/user-logs/add-user')}
-            className="flex items-center gap-2 bg-brand-active text-white px-4 py-2 rounded-lg hover:bg-brand-hover transition-all shadow-sm font-semibold"
+            className="flex items-center gap-2 bg-brand-active text-white px-5 py-2.5 rounded-xl hover:bg-brand-hover transition-all shadow-lg shadow-brand-active/20 font-bold active:scale-[0.98]"
           >
             <Icons.Plus size={18} />
             <span>Add User</span>
           </button>
         }
       />
-      
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden">
+
+      <div className="bg-white rounded-3xl border-0 p-1 mt-6 overflow-hidden">
         {loading ? (
           <div className="py-20 text-center flex flex-col items-center gap-3">
             <Icons.RefreshCcw className="animate-spin text-brand-active" size={32} />
-            <p className="text-slate-500 font-medium">Fetching users...</p>
+            <p className="text-slate-500 font-medium tracking-tight">Fetching users...</p>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="py-20 text-center flex flex-col items-center gap-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+             <div className="p-4 bg-white rounded-full shadow-sm mb-2">
+              <Icons.Users size={32} className="text-slate-300" />
+            </div>
+            <p className="text-slate-500 font-medium">No users found in the system.</p>
           </div>
         ) : (
-          <CustomTable 
-            tableHeaders={tableHeaders} 
+          <CustomTable
+            tableHeaders={tableHeaders}
             tableData={users}
           />
         )}

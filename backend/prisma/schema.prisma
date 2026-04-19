@@ -5,7 +5,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -55,8 +54,8 @@ model Course {
   id          Int      @id @default(autoincrement())
   name        String
   code        String   @unique
-  teacherId   Int
-  teacher     User     @relation("TeacherCourses", fields: [teacherId], references: [id])
+  teacherId   Int?
+  teacher     User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

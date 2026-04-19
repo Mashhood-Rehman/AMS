@@ -30,12 +30,14 @@ const SearchableDropdown = ({
 
   const handleSelect = (option) => {
     if (isMulti) {
-      const newValue = value.includes(option.value)
-        ? value.filter(v => v !== option.value)
-        : [...value, option.value];
-      onChange(newValue);
+      const newValue = Array.isArray(value) 
+        ? (value.includes(option.value)
+          ? value.filter(v => v !== option.value)
+          : [...value, option.value])
+        : [option.value];
+      if (onChange) onChange(newValue);
     } else {
-      onChange(option.value);
+      if (onChange) onChange(option.value);
       setIsOpen(false);
     }
   };
@@ -50,7 +52,7 @@ const SearchableDropdown = ({
       
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`min-h-[48px] px-3 py-2 bg-white border rounded-xl shadow-sm cursor-pointer transition-all flex items-center justify-between gap-2
+        className={`min-h-[34px] px-3 py-0.5 bg-white border rounded-xl shadow-sm cursor-pointer transition-all flex items-center justify-between gap-2
           ${isOpen ? "border-brand-active ring-4 ring-brand-active/10" : "border-slate-200 hover:border-slate-300"}
           ${error ? "border-red-300 ring-red-100" : ""}
         `}
@@ -58,8 +60,8 @@ const SearchableDropdown = ({
         <div className="flex flex-wrap gap-1.5 overflow-hidden">
           {selectedLabels.length > 0 ? (
             isMulti ? (
-              selectedLabels.map(label => (
-                <span key={label} className="bg-brand-active/10 text-brand-active text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1 group animate-in fade-in zoom-in duration-200">
+              options.filter(opt => value.includes(opt.value)).map(opt => (
+                <span key={opt.value} className="bg-brand-active/10 text-brand-active text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 group animate-in fade-in zoom-in duration-200">
                   {label}
                   <X 
                     size={12} 
