@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+model User {
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
+  password  String
+  name      String
+  phone     String?
+  role      Role       @default(STUDENT)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Teacher relations
+  taughtCourses Course[] @relation("TeacherCourses")
+
+  // Student relations
+  enrollments Enrollment[]
+  attendance  Attendance[]
+  alerts      Alert[]
+}
+
+model Course {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  teacherId   Int
+  teacher     User     @relation("TeacherCourses", fields: [teacherId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  enrollments Enrollment[]
+  attendance  Attendance[]
+}
+
+model Enrollment {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  courseId  Int
+  student   User     @relation(fields: [studentId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, courseId])
+}
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  studentId Int
+  courseId  Int
+  date      DateTime         @default(now())
+  status    AttendanceStatus @default(PRESENT)
+  location  String?
+  student   User             @relation(fields: [studentId], references: [id])
+  course    Course           @relation(fields: [courseId], references: [id])
+
+  @@unique([studentId, courseId, date])
+}
+
+model Alert {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  message   String
+  dateTime  DateTime @default(now())
+  isRead    Boolean  @default(false)
+  student   User     @relation(fields: [studentId], references: [id])
+}

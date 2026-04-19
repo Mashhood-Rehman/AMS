@@ -1,0 +1,52 @@
+{
+  "name": "ams-desktop",
+  "version": "1.0.0",
+  "author": "AMS Admin team",
+  "description": "Attendance Management System Desktop",
+  "main": "electron/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently -n \"WEB,API,APP\" -c \"blue,green,magenta\" \"npm run dev --prefix frontend\" \"npm run start --prefix backend\" \"npx wait-on http://localhost:5173 && electron .\"",
+    "build": "npm run build --prefix frontend && electron-builder",
+    "postinstall": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "com.ams.desktop",
+    "productName": "AMS Admin Dashboard",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!node_modules/.bin",
+          "!node_modules/.cache",
+          "!prisma/migrations"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/@prisma/engines/**",
+      "**/node_modules/prisma/engines/**"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "frontend/public/vite.svg"
+    }
+  }
+}
