@@ -111,10 +111,26 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// Get All Users
+// Get All Users (with optional filters)
 export const getAllUsers = async (req, res) => {
   try {
+    const { role, courseId, status } = req.query;
+
+    const where = {};
+    if (role) where.role = role.toUpperCase();
+    if (status) where.status = status.toUpperCase();
+    
+    // If courseId is provided, filter students enrolled in that course
+    if (courseId) {
+      where.enrollments = {
+        some: {
+          courseId: parseInt(courseId)
+        }
+      };
+    }
+
     const users = await prisma.user.findMany({
+      where,
       select: {
         id: true,
         email: true,

@@ -13,7 +13,11 @@ import Courses from './pages/Courses/Courses';
 import CoursesList from './pages/Courses/CoursesList';
 import AddCourse from './pages/Courses/AddCourse';
 
-const Attendance = () => <div className="stat-card"><h2>Attendance Management</h2><p>Feature coming soon...</p></div>;
+import Attendance from './pages/Attendance/Attendance';
+import MarkAttendance from './pages/Attendance/MarkAttendance';
+import AttendanceLogs from './pages/Attendance/AttendanceLogs';
+import AttendanceSummary from './pages/Attendance/AttendanceSummary';
+
 const Students = () => <div className="stat-card"><h2>Student Records</h2><p>Feature coming soon...</p></div>;
 const Reports = () => <div className="stat-card"><h2>System Reports</h2><p>Feature coming soon...</p></div>;
 const Settings = () => <div className="stat-card"><h2>Settings</h2><p>Feature coming soon...</p></div>;
@@ -33,7 +37,14 @@ function App() {
 
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="attendance" element={<Attendance />} />
+
+            <Route path="attendance" element={<Attendance />}>
+              <Route index element={<Navigate to="mark" replace />} />
+              <Route path="mark" element={<MarkAttendance />} />
+              <Route path="logs" element={<AttendanceLogs />} />
+              <Route path="summary" element={<AttendanceSummary />} />
+            </Route>
+
             <Route path="students" element={<Students />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />

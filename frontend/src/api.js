@@ -66,7 +66,99 @@ export const api = {
     } catch (error) {
       throw error.response?.data || { message: 'Network error or server unavailable' };
     }
-  }
+  },
+
+  // ── Attendance ──────────────────────────────────────────────────────────────
+  markAttendance: async (data) => {
+    try {
+      const response = await apiInstance.post('/attendance', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  bulkMarkAttendance: async (data) => {
+    try {
+      const response = await apiInstance.post('/attendance/bulk', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getAttendance: async (params = {}) => {
+    try {
+      const response = await apiInstance.get('/attendance', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getAttendanceByCourse: async (courseId, params = {}) => {
+    try {
+      const response = await apiInstance.get(`/attendance/course/${courseId}`, { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getAttendanceByStudent: async (studentId, params = {}) => {
+    try {
+      const response = await apiInstance.get(`/attendance/student/${studentId}`, { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getAttendanceSummary: async (params = {}) => {
+    try {
+      const response = await apiInstance.get('/attendance/summary', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  updateAttendance: async (id, data) => {
+    try {
+      const response = await apiInstance.put(`/attendance/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  deleteAttendance: async (id) => {
+    try {
+      const response = await apiInstance.delete(`/attendance/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  // ── Courses & Users (helpers for attendance forms) ──────────────────────────
+  getCourses: async () => {
+    try {
+      const response = await apiInstance.get('/courses');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getUsers: async (params = {}) => {
+    try {
+      const response = await apiInstance.get('/users', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
 };
 
 export default api;

@@ -84,6 +84,7 @@ model Attendance {
   date      DateTime         @default(now())
   status    AttendanceStatus @default(PRESENT)
   location  String?
+  notes     String?
   student   User             @relation(fields: [studentId], references: [id])
   course    Course           @relation(fields: [courseId], references: [id])
 
