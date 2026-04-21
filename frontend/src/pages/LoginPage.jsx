@@ -103,9 +103,9 @@ const LoginPage = () => {
         <div className="text-center pt-2">
           <p className="text-slate-500 text-xs">
             Forgot your password?{' '}
-            <a href="#" className="text-brand-dark hover:underline font-semibold transition-all">
+            <Link to="/forgot-password" className="text-brand-dark hover:underline font-semibold transition-all">
               Reset it here
-            </a>
+            </Link>
           </p>
         </div>
       </form>

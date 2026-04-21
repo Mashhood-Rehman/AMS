@@ -48,6 +48,24 @@ export const api = {
     } catch (error) {
       throw error.response?.data || { message: 'Network error or server unavailable' };
     }
+  },
+
+  forgotPassword: async (email) => {
+    try {
+      const response = await apiInstance.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  resetPassword: async (token, password) => {
+    try {
+      const response = await apiInstance.post('/auth/reset-password', { token, password });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
   }
 };
 

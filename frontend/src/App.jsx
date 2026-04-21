@@ -5,13 +5,14 @@ import AuthLayout from './layouts/AuthLayout';
 import Dashboard from './pages/Dashboard';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import UsersList from './pages/UserLogs/UsersList';
 import AddUser from './pages/UserLogs/AddUser';
 import Courses from './pages/Courses/Courses';
 import CoursesList from './pages/Courses/CoursesList';
 import AddCourse from './pages/Courses/AddCourse';
 
-// Placeholder components for other routes
 const Attendance = () => <div className="stat-card"><h2>Attendance Management</h2><p>Feature coming soon...</p></div>;
 const Students = () => <div className="stat-card"><h2>Student Records</h2><p>Feature coming soon...</p></div>;
 const Reports = () => <div className="stat-card"><h2>System Reports</h2><p>Feature coming soon...</p></div>;
@@ -22,14 +23,14 @@ function App() {
     <>
       <Router>
         <Routes>
-          {/* Auth Routes - Login is now the index route (/) */}
           <Route path="/" element={<AuthLayout />}>
             <Route index element={<LoginPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="signup" element={<SignupPage />} />
+            <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="reset-password/:token" element={<ResetPassword />} />
           </Route>
 
-          {/* Dashboard Routes - Nested under /dashboard */}
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="attendance" element={<Attendance />} />
