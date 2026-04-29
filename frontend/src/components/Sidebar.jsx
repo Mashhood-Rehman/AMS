@@ -21,7 +21,7 @@ const Sidebar = ({ isSidebarOpen }) => {
   return (
     <aside
       className={`fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out bg-brand-dark text-white flex flex-col
-        ${isSidebarOpen ? 'w-64' : 'w-20'}`}
+        ${isSidebarOpen ? 'w-64' : 'w-20 overflow-hidden'}`}
     >
       <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto custom-scrollbar">
         {navItems.map((item) => {

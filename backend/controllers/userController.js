@@ -1,9 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../db.js';
 
-// Create User (Admin/Teacher creates student/user)
+// Create User (Admin/Principal creates student/teacher)
 export const createUser = async (req, res) => {
-  const { email, password, name, role, phone, status, courseIds } = req.body;
+  const { email, password, name, role, phone, status, courseIds, instituteId } = req.body;
 
   try {
     // Basic validation
@@ -12,7 +12,7 @@ export const createUser = async (req, res) => {
     }
 
     // Role validation
-    const validRoles = ['ADMIN', 'TEACHER', 'STUDENT'];
+    const validRoles = ['ADMIN', 'PRINCIPAL', 'TEACHER', 'STUDENT'];
     if (role && !validRoles.includes(role.toUpperCase())) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
@@ -21,6 +21,17 @@ export const createUser = async (req, res) => {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Email already in use' });
+    }
+
+    // Get the creator's info
+    const creator = await prisma.user.findUnique({ where: { id: req.userId } });
+
+    // Logic for instituteId:
+    // If Admin creates a Principal, they might provide an instituteId or it might be set later.
+    // If a Principal creates a Teacher/Student, we use the Principal's instituteId.
+    let targetInstituteId = instituteId ? parseInt(instituteId) : null;
+    if (creator.role === 'PRINCIPAL') {
+      targetInstituteId = creator.instituteId;
     }
 
     // Hash password
@@ -35,7 +46,9 @@ export const createUser = async (req, res) => {
         phone,
         status: status || 'ACTIVE',
         role: (role || 'STUDENT').toUpperCase(),
-        taughtCourses: role === 'TEACHER' && courseIds ? {
+        instituteId: targetInstituteId,
+        createdBy: req.userId,
+        taughtCourses: (role === 'TEACHER' || role === 'PRINCIPAL') && courseIds ? {
           connect: courseIds.map(id => ({ id: parseInt(id) }))
         } : undefined
       },
@@ -45,7 +58,7 @@ export const createUser = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'User created successfully',
-      user: { id: user.id, email: user.email, name: user.name, role: user.role }
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, instituteId: user.instituteId }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
@@ -55,7 +68,7 @@ export const createUser = async (req, res) => {
 // Edit User
 export const updateUser = async (req, res) => {
   const { id } = req.params;
-  const { email, password, name, role, phone, status, courseIds } = req.body;
+  const { email, password, name, role, phone, status, courseIds, instituteId } = req.body;
 
   try {
     // Check if user exists
@@ -65,7 +78,7 @@ export const updateUser = async (req, res) => {
     }
 
     // Role validation
-    const validRoles = ['ADMIN', 'TEACHER', 'STUDENT'];
+    const validRoles = ['ADMIN', 'PRINCIPAL', 'TEACHER', 'STUDENT'];
     if (role && !validRoles.includes(role.toUpperCase())) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
@@ -77,10 +90,11 @@ export const updateUser = async (req, res) => {
       phone: phone !== undefined ? phone : targetUser.phone,
       status: status || targetUser.status,
       role: role ? role.toUpperCase() : targetUser.role,
+      instituteId: instituteId ? parseInt(instituteId) : targetUser.instituteId,
     };
 
-    // Update teacher courses if role is TEACHER
-    if (updateData.role === 'TEACHER' && courseIds) {
+    // Update teacher/principal courses
+    if ((updateData.role === 'TEACHER' || updateData.role === 'PRINCIPAL') && courseIds) {
       updateData.taughtCourses = {
         set: courseIds.map(id => ({ id: parseInt(id) }))
       };
@@ -100,10 +114,9 @@ export const updateUser = async (req, res) => {
     res.json({
       success: true,
       message: 'User updated successfully',
-      user: { id: updatedUser.id, email: updatedUser.email, name: updatedUser.name, role: updatedUser.role }
+      user: { id: updatedUser.id, email: updatedUser.email, name: updatedUser.name, role: updatedUser.role, instituteId: updatedUser.instituteId }
     });
   } catch (error) {
-    // Handle email conflict during update
     if (error.code === 'P2002') {
       return res.status(400).json({ success: false, message: 'Email address already in use' });
     }
@@ -114,12 +127,22 @@ export const updateUser = async (req, res) => {
 // Get All Users (with optional filters)
 export const getAllUsers = async (req, res) => {
   try {
-    const { role, courseId, status } = req.query;
+    const { role, courseId, status, instituteId: filterInstituteId } = req.query;
+
+    // Get the requester's info to scope results
+    const requester = await prisma.user.findUnique({ where: { id: req.userId } });
 
     const where = {};
     if (role) where.role = role.toUpperCase();
     if (status) where.status = status.toUpperCase();
     
+    // Scope by Institute
+    if (requester.role === 'PRINCIPAL') {
+      where.instituteId = requester.instituteId;
+    } else if (filterInstituteId) {
+      where.instituteId = parseInt(filterInstituteId);
+    }
+
     // If courseId is provided, filter students enrolled in that course
     if (courseId) {
       where.enrollments = {
@@ -138,6 +161,7 @@ export const getAllUsers = async (req, res) => {
         phone: true,
         role: true,
         status: true,
+        instituteId: true,
         taughtCourses: {
           select: { id: true, name: true, code: true }
         },

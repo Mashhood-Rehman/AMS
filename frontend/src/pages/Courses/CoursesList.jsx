@@ -80,7 +80,7 @@ const CoursesList = ({ onEdit }) => {
   ];
 
   return (
-    <div className="animate-fade-in">
+    <div className="">
       <div className="bg-white rounded-3xl border-0 p-1 overflow-hidden">
         {loading ? (
           <div className="py-20 text-center flex flex-col items-center gap-3">

@@ -92,7 +92,7 @@ const AddCourse = ({ courseId, onSuccess }) => {
 
   if (fetching) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4 animate-fade-in">
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 size={40} className="animate-spin text-brand-active" />
         <p className="text-slate-500 font-medium tracking-tight">Loading details...</p>
       </div>
@@ -100,7 +100,7 @@ const AddCourse = ({ courseId, onSuccess }) => {
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="">
       <div className="bg-white rounded-3xl border-0 p-1">
         <form onSubmit={handleSubmit} className="space-y-4 p-4 md:p-6 bg-slate-50/30 rounded-2xl border border-slate-100">
           <div className="flex items-center gap-3 mb-2">
@@ -120,7 +120,7 @@ const AddCourse = ({ courseId, onSuccess }) => {
           )}
 
           {success && (
-            <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center gap-3 text-sm font-medium animate-fade-in">
+            <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center gap-3 text-sm font-medium">
               <CheckCircle2 size={18} />
               Course {isEditMode ? 'updated' : 'created'} successfully!
             </div>

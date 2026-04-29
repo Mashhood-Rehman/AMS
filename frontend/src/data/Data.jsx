@@ -6,11 +6,21 @@ import {
   FileText,
   Settings,
   History,
-  BookOpen
+  BookOpen,
+  Building2
 } from 'lucide-react';
 
 export const navItems = [
   { title: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
+  {
+    title: 'Institutes',
+    icon: <Building2 size={20} />,
+    path: '/dashboard/institutes',
+    subTabs: [
+      { title: 'Institute List', path: '/dashboard/institutes/list' },
+      { title: 'Add Institute', path: '/dashboard/institutes/add' },
+    ]
+  },
   { title: 'Attendance', icon: <ClipboardCheck size={20} />, path: '/dashboard/attendance' },
   { title: 'Students', icon: <Users size={20} />, path: '/dashboard/students' },
   {

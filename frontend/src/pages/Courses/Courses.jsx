@@ -66,7 +66,7 @@ const Courses = () => {
       </div>
 
       {/* Dynamic Content Panel */}
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="duration-500">
         {activeTab === 'list' ? (
           <CoursesList onEdit={handleEdit} />
         ) : (

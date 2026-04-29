@@ -96,12 +96,11 @@ const MarkAttendance = () => {
   const lateCount    = records.filter(r => r.status === 'LATE').length;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl border shadow-lg text-sm font-medium transition-all animate-fade-in
-          ${toast.type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-600'}`}>
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl border shadow-lg text-sm font-medium transition-all ${toast.type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-600'}`}>
           {toast.type === 'success' ? <CheckCircle size={18} /> : <XCircle size={18} />}
           {toast.message}
         </div>

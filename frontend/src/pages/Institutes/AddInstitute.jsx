@@ -1,0 +1,237 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import {
+  ArrowLeft,
+  Save,
+  Building2,
+  Phone,
+  MapPin,
+  Loader2,
+  Upload,
+  UserCircle
+} from 'lucide-react';
+import SearchableDropdown from '../../components/SearchableDropdown';
+import { toast } from 'react-toastify';
+
+const AddInstitute = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [fetchingPrincipals, setFetchingPrincipals] = useState(true);
+  const [principals, setPrincipals] = useState([]);
+  const [formData, setFormData] = useState({
+    name: '',
+    classesOffered: '',
+    phone: '',
+    address: '',
+    principalId: ''
+  });
+  const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    fetchPrincipals();
+  }, []);
+
+  const fetchPrincipals = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/users?role=PRINCIPAL', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.data.success) {
+        setPrincipals(response.data.users.map(u => ({
+          label: u.name,
+          value: u.id
+        })));
+      }
+    } catch (err) {
+      toast.error('Failed to fetch principals');
+    } finally {
+      setFetchingPrincipals(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.name) newErrors.name = 'Institute name is required';
+    if (!formData.classesOffered) newErrors.classesOffered = 'Classes offered info is required';
+    if (!formData.principalId) newErrors.principalId = 'Principal assignment is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.post('http://localhost:5000/api/institutes', formData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+
+      if (response.data.success) {
+        toast.success('Institute created successfully');
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create institute');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto pb-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8 px-1">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-50 text-brand-active rounded-xl flex items-center justify-center shadow-inner">
+            <Building2 size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Setup New Institute</h1>
+            <p className="text-sm text-slate-500 font-medium tracking-tight">Register a main branch and assign a Principal.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-[0.98]"
+        >
+          <ArrowLeft size={18} />
+          Go Back
+        </button>
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+        <form onSubmit={handleSubmit} className="p-8 md:p-12">
+          
+          <div className="flex flex-col lg:flex-row gap-12">
+            
+            {/* Left Column: Logo Upload (Matching the design in the photo) */}
+            <div className="w-full lg:w-1/4 flex flex-col items-center gap-4">
+              <div className="w-48 h-48 rounded-[2rem] border-2 border-dashed border-sky-300 bg-sky-50/30 flex flex-col items-center justify-center gap-3 relative group cursor-pointer transition-all hover:bg-sky-50">
+                <div className="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
+                  <UserCircle size={64} />
+                </div>
+                <button type="button" className="bg-sky-200 text-sky-800 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-sky-300 transition-colors flex items-center gap-2">
+                  <Upload size={14} />
+                  Upload Institute Logo
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 font-medium text-center px-4">Recommended size: 512x512px. JPG or PNG.</p>
+            </div>
+
+            {/* Right Column: Form Fields */}
+            <div className="flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                
+                {/* Institute Name */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-slate-700 ml-1">
+                    Institute Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    type="text"
+                    placeholder="e.g. Oakridge International School"
+                    className={`custom_input ${errors.name ? 'border-red-400 focus:border-red-500' : ''}`}
+                  />
+                  {errors.name && <p className="text-xs text-red-500 font-bold pl-2">{errors.name}</p>}
+                </div>
+
+                {/* Classes Offered (Trading Name slot) */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-slate-700 ml-1">
+                    Classes Offered <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    name="classesOffered"
+                    value={formData.classesOffered}
+                    onChange={handleInputChange}
+                    type="text"
+                    placeholder="e.g. 1 to 10, or Kindergarten to 12"
+                    className={`custom_input ${errors.classesOffered ? 'border-red-400 focus:border-red-500' : ''}`}
+                  />
+                  {errors.classesOffered && <p className="text-xs text-red-500 font-bold pl-2">{errors.classesOffered}</p>}
+                </div>
+
+                {/* Contact Number */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-slate-700 ml-1">
+                    Official Contact <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative group">
+                    <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                    <input
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      type="tel"
+                      placeholder="+44 20 1234 5678"
+                      className="custom_input"
+                    />
+                  </div>
+                </div>
+
+                {/* Assign to Principal (Associate Admin slot) */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-slate-700 ml-1">
+                    Assign to Principal <span className="text-red-500">*</span>
+                  </label>
+                  <SearchableDropdown
+                    options={principals}
+                    value={formData.principalId}
+                    onChange={(val) => setFormData(prev => ({ ...prev, principalId: val }))}
+                    placeholder={fetchingPrincipals ? "Loading..." : "Select Principal"}
+                    isLoading={fetchingPrincipals}
+                  />
+                  {errors.principalId && <p className="text-xs text-red-500 font-bold pl-2">{errors.principalId}</p>}
+                </div>
+
+                {/* Address */}
+                <div className="md:col-span-2 space-y-1.5 pt-2">
+                  <label className="block text-sm font-bold text-slate-700 ml-1">
+                    Institute Address <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative group">
+                    <MapPin size={18} className="absolute left-4 top-4 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                    <textarea
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      rows="4"
+                      placeholder="e.g. 1st Floor, 29 Minerva Road, London, England, NW10 6HJ"
+                      className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none transition-all focus:border-brand-active focus:ring-4 focus:ring-brand-active/10 text-slate-700"
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="mt-12 flex items-center justify-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex items-center gap-3 px-12 py-4 bg-brand-active text-white rounded-xl font-bold shadow-xl shadow-brand-active/20 hover:bg-brand-hover active:scale-[0.98] transition-all disabled:opacity-70 text-lg"
+                >
+                  {loading ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
+                  Create Institute Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default AddInstitute;

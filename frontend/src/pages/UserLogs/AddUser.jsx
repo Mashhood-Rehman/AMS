@@ -142,6 +142,7 @@ const AddUser = () => {
 
   const roleOptions = [
     { label: 'Admin', value: 'ADMIN' },
+    { label: 'Principal', value: 'PRINCIPAL' },
     { label: 'Teacher', value: 'TEACHER' },
     { label: 'Student', value: 'STUDENT' }
   ];
@@ -154,7 +155,7 @@ const AddUser = () => {
 
   if (fetching) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4 animate-fade-in">
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 size={40} className="animate-spin text-brand-active" />
         <p className="text-slate-500 font-medium">Fetching User Details...</p>
       </div>
@@ -162,7 +163,7 @@ const AddUser = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto animate-fade-in pb-8">
+    <div className="max-w-5xl mx-auto pb-8">
       {/* Compact Header */}
       <div className="flex items-center justify-between mb-6 px-1">
         <div className="flex items-center gap-4">
@@ -290,7 +291,7 @@ const AddUser = () => {
 
           {/* Teacher Assignment Section */}
           {formData.role === 'TEACHER' && (
-            <div className="mt-4 pt-6 border-t border-slate-200/50 animate-in fade-in slide-in-from-bottom-2 duration-400">
+            <div className="mt-4 pt-6 border-t border-slate-200/50 duration-400">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-indigo-50 text-brand-active rounded-xl">
                   <BookOpen size={20} />

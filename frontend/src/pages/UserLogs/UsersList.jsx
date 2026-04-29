@@ -91,7 +91,7 @@ const UsersList = () => {
   ];
 
   return (
-    <div className="animate-fade-in">
+    <div className="">
       <CustomHeader
         title="Users Management"
         subtitle="Manage system users, access levels, and role assignments."
