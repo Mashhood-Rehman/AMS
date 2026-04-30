@@ -9,7 +9,8 @@ import {
   MapPin,
   Loader2,
   Upload,
-  UserCircle
+  UserCircle,
+  GraduationCap
 } from 'lucide-react';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
@@ -139,7 +140,7 @@ const AddInstitute = () => {
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col lg:flex-row gap-12">
             <div className="w-full lg:w-1/4 flex flex-col items-center gap-4">
-              <div className="w-48 h-48 rounded-lg border-2 border-dashed border-sky-300 bg-sky-50/30 flex flex-col items-center justify-center gap-3 relative group cursor-pointer transition-all hover:bg-sky-50">
+              <div className="w-48 h-48 rounded-lg b bg-sky-50/30 flex flex-col items-center justify-center gap-3 relative group cursor-pointer transition-all hover:bg-sky-50">
                 <div className="w-24 h-24 rounded-lg bg-slate-200 flex items-center justify-center text-slate-400">
                   <UserCircle size={64} />
                 </div>
@@ -160,14 +161,17 @@ const AddInstitute = () => {
                   <label className="block text-sm font-bold text-slate-700">
                     Institute Name <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    type="text"
-                    placeholder="e.g. Oakridge International School"
-                    className={`custom_input ${errors.name ? 'border-red-400 focus:border-red-500' : ''}`}
-                  />
+                  <div className="relative group">
+                    <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                    <input
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      type="text"
+                      placeholder="e.g. Oakridge International School"
+                      className={`custom_input ${errors.name ? 'border-red-400 focus:border-red-500' : ''}`}
+                    />
+                  </div>
                   {errors.name && <p className="text-xs text-red-500 font-bold pl-2">{errors.name}</p>}
                 </div>
 
@@ -176,14 +180,17 @@ const AddInstitute = () => {
                   <label className="block text-sm font-bold text-slate-700 ml-1">
                     Classes Offered <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    name="classesOffered"
-                    value={formData.classesOffered}
-                    onChange={handleInputChange}
-                    type="text"
-                    placeholder="e.g. 1 to 10, or Kindergarten to 12"
-                    className={`custom_input ${errors.classesOffered ? 'border-red-400 focus:border-red-500' : ''}`}
-                  />
+                  <div className="relative group">
+                    <GraduationCap size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                    <input
+                      name="classesOffered"
+                      value={formData.classesOffered}
+                      onChange={handleInputChange}
+                      type="text"
+                      placeholder="e.g. 1 to 10, or Kindergarten to 12"
+                      className={`custom_input ${errors.classesOffered ? 'border-red-400 focus:border-red-500' : ''}`}
+                    />
+                  </div>
                   {errors.classesOffered && <p className="text-xs text-red-500 font-bold pl-2">{errors.classesOffered}</p>}
                 </div>
 
@@ -244,7 +251,7 @@ const AddInstitute = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex items-center gap-3 px-6 py-2 rounded-lg bg-brand-active text-white font-bold hover:bg-brand-hover active:scale-[0.98] transition-all disabled:opacity-70 text-lg"
+                  className="flex items-center gap-3 px-6 py-2 rounded-lg bg-brand-active text-white hover:bg-brand-hover active:scale-[0.98] transition-all disabled:opacity-70 text-lg"
                 >
                   {isEditMode ? 'Update Institute Details' : 'Create Institute Account'}
                 </button>

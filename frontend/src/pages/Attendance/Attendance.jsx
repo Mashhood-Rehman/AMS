@@ -11,9 +11,9 @@ const tabs = [
 
 const Attendance = () => {
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="space-y-6">
       {/* Page Header */}
-      <SectionHeader 
+      <SectionHeader
         title="Attendance Management"
         subtitle="Mark, view, and analyse student attendance across all courses."
       />
