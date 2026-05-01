@@ -11,6 +11,13 @@ const Sidebar = ({ isSidebarOpen }) => {
   const [openMenus, setOpenMenus] = useState({});
   const location = useLocation();
 
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userPermissions = user.permissions || [];
+
+  const filteredNavItems = navItems.filter(item =>
+    user.role === 'ADMIN' || userPermissions.includes(item.permissionKey)
+  );
+
   const toggleMenu = (title) => {
     setOpenMenus(prev => ({
       ...prev,
@@ -24,7 +31,7 @@ const Sidebar = ({ isSidebarOpen }) => {
         ${isSidebarOpen ? 'w-64' : 'w-20 overflow-hidden'}`}
     >
       <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto custom-scrollbar">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const hasSubTabs = item.subTabs && item.subTabs.length > 0;
           const isOpen = openMenus[item.title];
           const isActive = location.pathname === item.path || (hasSubTabs && location.pathname.startsWith(item.path));

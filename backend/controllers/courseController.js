@@ -24,7 +24,7 @@ export const getAllCourses = async (req, res) => {
 // Create a new course
 export const createCourse = async (req, res) => {
   try {
-    const { name, code, teacherId } = req.body;
+    const { name, code, teacherId, className, instituteId } = req.body;
 
     if (!name || !code) {
       return res.status(400).json({ success: false, message: 'Please provide name and code' });
@@ -43,7 +43,9 @@ export const createCourse = async (req, res) => {
       data: {
         name,
         code,
-        teacherId: teacherId ? parseInt(teacherId) : null
+        teacherId: teacherId ? parseInt(teacherId) : null,
+        className,
+        instituteId: instituteId || null
       },
       include: {
         teacher: {
@@ -62,7 +64,7 @@ export const createCourse = async (req, res) => {
 export const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, teacherId } = req.body;
+    const { name, code, teacherId, className } = req.body;
 
     const courseId = parseInt(id);
 
@@ -90,7 +92,8 @@ export const updateCourse = async (req, res) => {
       data: {
         name: name || existingCourse.name,
         code: code || existingCourse.code,
-        teacherId: teacherId ? parseInt(teacherId) : existingCourse.teacherId
+        teacherId: teacherId ? parseInt(teacherId) : existingCourse.teacherId,
+        className: className !== undefined ? className : existingCourse.className
       },
       include: {
         teacher: {

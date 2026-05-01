@@ -18,8 +18,8 @@ const DashboardLayout = () => {
       >
         <Navbar toggleSidebar={toggleSidebar} />
 
-        <main className="flex-1 p-6 md:p-8 bg-white">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-4">
+          <div>
             <Outlet />
           </div>
         </main>

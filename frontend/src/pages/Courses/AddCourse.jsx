@@ -6,7 +6,9 @@ import {
   Hash,
   Loader2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  LayoutGrid,
+  ChevronDown
 } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
 
@@ -15,19 +17,22 @@ const AddCourse = ({ courseId, onSuccess }) => {
 
   const [formData, setFormData] = useState({
     name: '',
-    code: ''
+    code: '',
+    className: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEditMode);
+  const [instituteClasses, setInstituteClasses] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    fetchInstituteClasses();
     if (isEditMode) {
       fetchCourseDetails();
     } else {
-      setFormData({ name: '', code: '' });
+      setFormData({ name: '', code: '', className: '' });
       setFetching(false);
     }
   }, [courseId]);
@@ -41,13 +46,33 @@ const AddCourse = ({ courseId, onSuccess }) => {
       if (response.data.success) {
         setFormData({
           name: response.data.course.name,
-          code: response.data.course.code
+          code: response.data.course.code,
+          className: response.data.course.className || ''
         });
       }
     } catch (err) {
       setError('Failed to fetch course details');
     } finally {
       setFetching(false);
+    }
+  };
+
+  const fetchInstituteClasses = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const instituteId = user.instituteId;
+      if (instituteId) {
+        const response = await axios.get(`http://localhost:5000/api/institutes/${instituteId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (response.data.success) {
+          const classesStr = response.data.institute.classesOffered || "";
+          const classesArr = classesStr.split(',').map(c => c.trim()).filter(c => c);
+          setInstituteClasses(classesArr);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch institute classes', err);
     }
   };
 
@@ -74,7 +99,12 @@ const AddCourse = ({ courseId, onSuccess }) => {
 
       const method = isEditMode ? 'put' : 'post';
 
-      const response = await axios[method](url, formData, {
+      const payload = { 
+        ...formData,
+        instituteId: JSON.parse(localStorage.getItem('user') || '{}').instituteId
+      };
+
+      const response = await axios[method](url, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
@@ -153,23 +183,45 @@ const AddCourse = ({ courseId, onSuccess }) => {
                 />
               </div>
             </div>
+
+            {/* Class Assignment */}
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="block text-sm font-bold text-slate-700 ml-1">Assigned To Class</label>
+              <div className="relative group">
+                <LayoutGrid size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
+                <select
+                  name="className"
+                  value={formData.className}
+                  onChange={handleInputChange}
+                  className="custom_input pl-12 appearance-none"
+                >
+                  <option value="">Select Class...</option>
+                  {instituteClasses.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <ChevronDown size={18} />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium ml-1">This course will be visible to all students in the selected class.</p>
+            </div>
           </div>
 
           <div className="pt-4 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => onSuccess && onSuccess()}
-              className="px-6 py-2.5 text-slate-500 font-bold hover:text-slate-700 transition-colors"
+              className="btn btn-cancel"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || success}
-              className="flex items-center gap-2 px-8 py-2.5 bg-brand-dark text-white rounded-lg font-bold hover:bg-brand-hover active:scale-[0.98] transition-all shadow-lg shadow-brand-dark/20 disabled:opacity-70"
+              className="btn btn-blue"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-              {isEditMode ? 'Update' : 'Create'}
+              {loading ? "Processing..." : (isEditMode ? 'Update' : 'Create')}
             </button>
           </div>
         </form>

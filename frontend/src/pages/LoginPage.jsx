@@ -19,14 +19,14 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       const data = await api.login(formData);
       if (data.success) {
         // Store token and user info
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        
+
         // Redirect to dashboard
         navigate('/dashboard');
       }
@@ -40,11 +40,11 @@ const LoginPage = () => {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs py-2 px-3 rounded-lg animate-fade-in">
+        <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs py-2 px-3 rounded-lg">
           {error}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-3">
           <div>

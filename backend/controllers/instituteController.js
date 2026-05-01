@@ -68,7 +68,7 @@ export const getInstituteById = async (req, res) => {
   const { id } = req.params;
   try {
     const institute = await prisma.institute.findUnique({
-      where: { id: parseInt(id) },
+      where: { id },
       include: {
         principal: {
           select: { id: true, name: true, email: true, phone: true }
@@ -111,7 +111,7 @@ export const updateInstitute = async (req, res) => {
     }
 
     const institute = await prisma.institute.update({
-      where: { id: parseInt(id) },
+      where: { id },
       data: updateData
     });
 
@@ -132,7 +132,7 @@ export const updateInstitute = async (req, res) => {
 export const deleteInstitute = async (req, res) => {
   const { id } = req.params;
   try {
-    await prisma.institute.delete({ where: { id: parseInt(id) } });
+    await prisma.institute.delete({ where: { id } });
     res.json({ success: true, message: 'Institute deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

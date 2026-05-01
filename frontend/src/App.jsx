@@ -14,13 +14,14 @@ import CoursesList from './pages/Courses/CoursesList';
 import AddCourse from './pages/Courses/AddCourse';
 import AddInstitute from './pages/Institutes/AddInstitute';
 import InstitutesList from './pages/Institutes/InstitutesList';
+import StudentsList from './pages/Students/StudentsList';
 
 import Attendance from './pages/Attendance/Attendance';
 import MarkAttendance from './pages/Attendance/MarkAttendance';
 import AttendanceLogs from './pages/Attendance/AttendanceLogs';
 import AttendanceSummary from './pages/Attendance/AttendanceSummary';
 
-const Students = () => <div className="stat-card"><h2>Student Records</h2><p>Feature coming soon...</p></div>;
+// Placeholder components for future development
 const Reports = () => <div className="stat-card"><h2>System Reports</h2><p>Feature coming soon...</p></div>;
 const Settings = () => <div className="stat-card"><h2>Settings</h2><p>Feature coming soon...</p></div>;
 
@@ -47,7 +48,7 @@ function App() {
               <Route path="summary" element={<AttendanceSummary />} />
             </Route>
 
-            <Route path="students" element={<Students />} />
+            <Route path="students" element={<StudentsList />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
             <Route path="user-logs">

@@ -33,10 +33,24 @@ const AddUser = () => {
     phone: '',
     role: 'STUDENT',
     status: 'ACTIVE',
-    courseIds: []
+    courseIds: [],
+    permissions: [],
+    className: ''
   });
 
+  const availablePermissions = [
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'institutes', label: 'Institutes' },
+    { id: 'attendance', label: 'Attendance' },
+    { id: 'students', label: 'Students' },
+    { id: 'courses', label: 'Courses' },
+    { id: 'reports', label: 'Reports' },
+    { id: 'settings', label: 'Settings' },
+    { id: 'user-logs', label: 'User Logs' },
+  ];
+
   const [courses, setCourses] = useState([]);
+  const [instituteClasses, setInstituteClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEditMode);
   const [showPassword, setShowPassword] = useState(false);
@@ -44,6 +58,7 @@ const AddUser = () => {
 
   useEffect(() => {
     fetchCourses();
+    fetchInstituteClasses();
     if (isEditMode) {
       fetchUser();
     }
@@ -65,6 +80,39 @@ const AddUser = () => {
     }
   };
 
+  const fetchInstituteClasses = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+      const instituteId = user.instituteId;
+      if (instituteId) {
+        const response = await axios.get(`http://localhost:5000/api/institutes/${instituteId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (response.data.success) {
+          const classesStr = response.data.institute.classesOffered || "";
+
+          let classesArr = [];
+          // Handle range like "1-10"
+          const rangeMatch = classesStr.match(/^(\d+)-(\d+)$/);
+          if (rangeMatch) {
+            const start = parseInt(rangeMatch[1]);
+            const end = parseInt(rangeMatch[2]);
+            for (let i = start; i <= end; i++) {
+              classesArr.push(`Class ${i}`);
+            }
+          } else {
+            classesArr = classesStr.split(',').map(c => c.trim()).filter(c => c);
+          }
+
+          setInstituteClasses(classesArr.map(c => ({ label: c, value: c })));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch institute classes', err);
+    }
+  };
+
   const fetchUser = async () => {
     setFetching(true);
     try {
@@ -81,7 +129,9 @@ const AddUser = () => {
             phone: user.phone || '',
             role: user.role,
             status: user.status || 'ACTIVE',
-            courseIds: user.taughtCourses ? user.taughtCourses.map(c => c.id) : []
+            courseIds: user.taughtCourses ? user.taughtCourses.map(c => c.id) : [],
+            permissions: user.permissions || [],
+            className: user.className || ''
           });
         }
       }
@@ -108,6 +158,27 @@ const AddUser = () => {
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handlePermissionChange = (permId) => {
+    setFormData(prev => {
+      const currentPerms = prev.permissions || [];
+      if (currentPerms.includes(permId)) {
+        return { ...prev, permissions: currentPerms.filter(p => p !== permId) };
+      } else {
+        return { ...prev, permissions: [...currentPerms, permId] };
+      }
+    });
+  };
+
+  const handleSelectAllPermissions = () => {
+    const allPermIds = filteredPermissions.map(p => p.id);
+    const areAllSelected = formData.permissions.length === allPermIds.length;
+
+    setFormData(prev => ({
+      ...prev,
+      permissions: areAllSelected ? [] : allPermIds
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -140,13 +211,34 @@ const AddUser = () => {
       setLoading(false);
     }
   };
+  // Get logged-in user role from localStorage
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUserRole = currentUser.role || 'ADMIN';
 
-  const roleOptions = [
-    { label: 'Admin', value: 'ADMIN' },
-    { label: 'Principal', value: 'PRINCIPAL' },
-    { label: 'Teacher', value: 'TEACHER' },
-    { label: 'Student', value: 'STUDENT' }
-  ];
+  // Role options filtered by creator's role
+  const roleOptions = (currentUserRole === 'ADMIN'
+    ? [
+      { label: 'Principal', value: 'PRINCIPAL' },
+      { label: 'Teacher', value: 'TEACHER' },
+      { label: 'Student', value: 'STUDENT' }
+    ]
+    : [
+      { label: 'Teacher', value: 'TEACHER' },
+      { label: 'Student', value: 'STUDENT' }
+    ]
+  );
+
+  // Define allowed permissions per role
+  const rolePermissionMap = {
+    PRINCIPAL: availablePermissions.map(p => p.id),
+    TEACHER: ['students', 'courses', 'reports', 'settings', 'institutes', 'attendance'],
+    STUDENT: ['students', 'reports', 'institutes', 'attendance', 'courses']
+  };
+
+  // Get filtered permissions based on the role being assigned to the new/edited user
+  const filteredPermissions = availablePermissions.filter(p =>
+    (rolePermissionMap[formData.role] || []).includes(p.id)
+  );
 
   const statusOptions = [
     { label: 'Active', value: 'ACTIVE' },
@@ -164,24 +256,23 @@ const AddUser = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-8">
+    <div>
       {/* Compact Header */}
-      <SectionHeader 
+      <SectionHeader
         title={isEditMode ? 'Update User Account' : 'Register New User'}
         subtitle="Configure profile, roles and access levels."
         button={
           <button
             onClick={() => navigate('/dashboard/user-logs/users-list')}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-600 rounded-lg font-bold hover:bg-slate-200 transition-all active:scale-[0.98]"
+            className="btn btn-cancel"
           >
-            <ArrowLeft size={18} />
             Back to list
           </button>
         }
       />
 
-      <div className="bg-white rounded-lg border-0 p-1">
-        <form onSubmit={handleSubmit} className="space-y-4 p-4 md:p-6 bg-slate-50/30 rounded-lg border border-slate-100">
+      <div>
+        <form onSubmit={handleSubmit}>
           {/* Main Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
             {/* Full Name */}
@@ -229,8 +320,8 @@ const AddUser = () => {
               {errors.email && <p className="text-xs text-red-500 font-bold pl-2">{errors.email}</p>}
             </div>
 
-             {/* Status Selection */}
-             <div className="space-y-1">
+            {/* Status Selection */}
+            <div className="space-y-1">
               <label className="block text-sm font-bold text-slate-700 ml-1">Account Status</label>
               <SearchableDropdown
                 options={statusOptions}
@@ -256,10 +347,23 @@ const AddUser = () => {
               </div>
             </div>
 
+            {/* Class Assignment (Conditional) */}
+            {formData.role === 'STUDENT' && (
+              <div className="space-y-1">
+                <label className="block text-sm font-bold text-slate-700 ml-1">Class Assignment</label>
+                <SearchableDropdown
+                  options={instituteClasses}
+                  value={formData.className}
+                  onChange={(val) => setFormData(prev => ({ ...prev, className: val }))}
+                  placeholder="Select Class"
+                />
+              </div>
+            )}
+
             {/* Password */}
-            <div className="space-y-1 md:col-span-2">
+            <div className={`space-y-1 ${formData.role === 'STUDENT' ? 'md:col-span-1' : 'md:col-span-2'}`}>
               <label className="block text-sm font-bold text-slate-700 ml-1">
-                {isEditMode ? "Reset Password (Optional)" : "Account Password"}
+                {isEditMode ? "Reset Password" : "Account Password"}
               </label>
               <div className="relative group">
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
@@ -268,7 +372,7 @@ const AddUser = () => {
                   value={formData.password}
                   onChange={handleInputChange}
                   type={showPassword ? "text" : "password"}
-                  placeholder={isEditMode ? "Leave blank to keep current" : "Minimum 8 characters"}
+                  placeholder={isEditMode ? "Keep current" : "Min. 8 chars"}
                   className={`custom_input pr-12 ${errors.password ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                 />
                 <button
@@ -309,22 +413,57 @@ const AddUser = () => {
             </div>
           )}
 
+          <div className="mt-4 pt-6 border-t border-slate-200/50">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 tracking-tight">Module Permissions</h3>
+                <p className="text-xs text-slate-500 font-medium">Select which modules this user can access in the sidebar.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSelectAllPermissions}
+                className="btn btn-cancel text-xs"
+              >
+                {formData.permissions.length === filteredPermissions.length ? 'Deselect All' : 'Select All Modules'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-white rounded-xl border border-slate-200">
+              {filteredPermissions.map((perm) => (
+                <label
+                  key={perm.id}
+                  className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer group border border-transparent hover:border-slate-100"
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.permissions.includes(perm.id)}
+                    onChange={() => handlePermissionChange(perm.id)}
+                    className="cursor-pointer mt-1 accent-brand-dark"
+                  />
+                  <span className={`text-sm font-bold transition-colors ${formData.permissions.includes(perm.id) ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700'}`}>
+                    {perm.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           {/* Form Actions */}
           <div className="pt-6 mt-4 border-t border-slate-200/50 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => navigate('/dashboard/user-logs/users-list')}
-              className="px-6 py-2.5 text-slate-500 font-bold hover:text-slate-700 transition-colors"
+              className="btn btn-cancel"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-10 py-3 bg-brand-dark text-white rounded-lg font-bold shadow-lg shadow-brand-dark/20 hover:bg-brand-hover active:scale-[0.98] transition-all disabled:opacity-70"
+              className="btn btn-blue"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-              {isEditMode ? "Save Changes" : "Create User Account"}
+              {loading ? "Processing..." : (isEditMode ? "Save Changes" : "Create User Account")}
             </button>
           </div>
         </form>

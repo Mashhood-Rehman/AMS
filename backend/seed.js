@@ -19,7 +19,36 @@ async function main() {
       password: adminPassword,
       name: 'System Admin',
       role: 'ADMIN',
+      permissions: ['dashboard', 'institutes', 'attendance', 'students', 'courses', 'reports', 'settings', 'user-logs'],
     },
+  });
+
+  // Create a Principal and Institute
+  const principal = await prisma.user.upsert({
+    where: { email: 'principal@ams.com' },
+    update: { password: commonPassword },
+    create: {
+      email: 'principal@ams.com',
+      password: commonPassword,
+      name: 'Mr. Principal',
+      role: 'PRINCIPAL',
+      permissions: ['dashboard', 'attendance', 'students', 'courses', 'reports', 'settings', 'user-logs'],
+    }
+  });
+
+  const institute = await prisma.institute.upsert({
+    where: { principalId: principal.id },
+    update: { classesOffered: '1-10' },
+    create: {
+      name: 'The Educators',
+      classesOffered: '1-10',
+      principalId: principal.id
+    }
+  });
+
+  await prisma.user.update({
+    where: { id: principal.id },
+    data: { instituteId: institute.id }
   });
 
   // Create a Teacher
@@ -31,6 +60,8 @@ async function main() {
       password: commonPassword,
       name: 'Dr. Smith',
       role: 'TEACHER',
+      instituteId: institute.id,
+      permissions: ['dashboard', 'attendance', 'students', 'courses', 'reports'],
     },
   });
 
@@ -61,6 +92,8 @@ async function main() {
         password: commonPassword,
         name: s.name,
         role: 'STUDENT',
+        instituteId: institute.id,
+        className: 'Class 5'
       },
     });
 

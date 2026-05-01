@@ -64,7 +64,14 @@ export const login = async (req, res) => {
     res.json({
       success: true,
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role }
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        name: user.name, 
+        role: user.role, 
+        permissions: user.permissions || [], 
+        instituteId: user.instituteId 
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -80,6 +87,8 @@ export const getMe = async (req, res) => {
         email: true,
         name: true,
         role: true,
+        permissions: true,
+        instituteId: true,
         createdAt: true
       }
     });
