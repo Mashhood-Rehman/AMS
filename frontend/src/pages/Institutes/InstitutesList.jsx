@@ -72,7 +72,7 @@ const InstitutesList = () => {
         </div>
       )
     },
-    { key: 'classesOffered', label: 'Classes' },
+    { key: 'maxClass', label: 'Max Class' },
     { 
       key: 'principalName', 
       label: 'Principal'

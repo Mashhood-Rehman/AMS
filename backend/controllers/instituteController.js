@@ -2,11 +2,11 @@ import { prisma } from '../db.js';
 
 // Create Institute
 export const createInstitute = async (req, res) => {
-  const { name, classesOffered, address, phone, principalId } = req.body;
+  const { name, maxClass, address, phone, principalId } = req.body;
 
   try {
-    if (!name || !classesOffered || !principalId) {
-      return res.status(400).json({ success: false, message: 'Name, classes offered, and principal are required' });
+    if (!name || !maxClass || !principalId) {
+      return res.status(400).json({ success: false, message: 'Name, max class, and principal are required' });
     }
 
     const principal = await prisma.user.findUnique({ where: { id: parseInt(principalId) } });
@@ -22,7 +22,7 @@ export const createInstitute = async (req, res) => {
     const institute = await prisma.institute.create({
       data: {
         name,
-        classesOffered,
+        maxClass: parseInt(maxClass),
         address,
         phone,
         principalId: parseInt(principalId)
@@ -31,7 +31,7 @@ export const createInstitute = async (req, res) => {
 
     await prisma.user.update({
       where: { id: parseInt(principalId) },
-      data: { instituteId: institute.id }
+      data: { institute: { connect: { id: institute.id } } }
     });
 
     res.status(201).json({
@@ -91,13 +91,14 @@ export const getInstituteById = async (req, res) => {
 
 // Update Institute
 export const updateInstitute = async (req, res) => {
+  console.log('Update Institute Request Body:', req.body);
   const { id } = req.params;
-  const { name, classesOffered, address, phone, principalId } = req.body;
+  const { name, maxClass, address, phone, principalId } = req.body;
 
   try {
     const updateData = {
       name,
-      classesOffered,
+      maxClass: maxClass !== undefined ? parseInt(maxClass) : undefined,
       address,
       phone
     };
@@ -118,7 +119,7 @@ export const updateInstitute = async (req, res) => {
     if (principalId) {
       await prisma.user.update({
         where: { id: parseInt(principalId) },
-        data: { instituteId: institute.id }
+        data: { institute: { connect: { id: institute.id } } }
       });
     }
 

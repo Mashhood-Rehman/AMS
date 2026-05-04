@@ -25,7 +25,7 @@ const AddInstitute = () => {
   const [principals, setPrincipals] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
-    classesOffered: '',
+    maxClass: '',
     phone: '',
     address: '',
     principalId: ''
@@ -66,7 +66,7 @@ const AddInstitute = () => {
         const inst = response.data.institute;
         setFormData({
           name: inst.name,
-          classesOffered: inst.classesOffered,
+          maxClass: inst.maxClass,
           phone: inst.phone || '',
           address: inst.address || '',
           principalId: inst.principalId || ''
@@ -86,7 +86,7 @@ const AddInstitute = () => {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name) newErrors.name = 'Institute name is required';
-    if (!formData.classesOffered) newErrors.classesOffered = 'Classes offered info is required';
+    if (!formData.maxClass) newErrors.maxClass = 'Highest class number is required';
     if (!formData.principalId) newErrors.principalId = 'Principal assignment is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -175,23 +175,24 @@ const AddInstitute = () => {
                   {errors.name && <p className="text-xs text-red-500 font-bold pl-2">{errors.name}</p>}
                 </div>
 
-                {/* Classes Offered (Trading Name slot) */}
+                {/* Highest Class Number */}
                 <div className="space-y-1.5">
                   <label className="block text-sm font-bold text-slate-700 ml-1">
-                    Classes Offered <span className="text-red-500">*</span>
+                    Highest Class Offered <span className="text-red-500">*</span>
                   </label>
                   <div className="relative group">
                     <GraduationCap size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
                     <input
-                      name="classesOffered"
-                      value={formData.classesOffered}
+                      name="maxClass"
+                      value={formData.maxClass}
                       onChange={handleInputChange}
-                      type="text"
-                      placeholder="e.g. 1 to 10, or Kindergarten to 12"
-                      className={`custom_input ${errors.classesOffered ? 'border-red-400 focus:border-red-500' : ''}`}
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 10 (if institute offers classes up to 10)"
+                      className={`custom_input ${errors.maxClass ? 'border-red-400 focus:border-red-500' : ''}`}
                     />
                   </div>
-                  {errors.classesOffered && <p className="text-xs text-red-500 font-bold pl-2">{errors.classesOffered}</p>}
+                  {errors.maxClass && <p className="text-xs text-red-500 font-bold pl-2">{errors.maxClass}</p>}
                 </div>
 
                 {/* Contact Number */}

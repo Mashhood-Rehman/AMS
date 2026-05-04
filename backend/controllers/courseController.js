@@ -43,9 +43,9 @@ export const createCourse = async (req, res) => {
       data: {
         name,
         code,
-        teacherId: teacherId ? parseInt(teacherId) : null,
+        ...(teacherId ? { teacher: { connect: { id: parseInt(teacherId) } } } : {}),
         className,
-        instituteId: instituteId || null
+        ...(instituteId ? { institute: { connect: { id: instituteId } } } : {}),
       },
       include: {
         teacher: {
@@ -92,7 +92,7 @@ export const updateCourse = async (req, res) => {
       data: {
         name: name || existingCourse.name,
         code: code || existingCourse.code,
-        teacherId: teacherId ? parseInt(teacherId) : existingCourse.teacherId,
+        ...(teacherId ? { teacher: { connect: { id: parseInt(teacherId) } } } : {}),
         className: className !== undefined ? className : existingCourse.className
       },
       include: {

@@ -79,7 +79,6 @@ const AddUser = () => {
       console.error('Failed to fetch courses', err);
     }
   };
-
   const fetchInstituteClasses = async () => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -90,21 +89,11 @@ const AddUser = () => {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.data.success) {
-          const classesStr = response.data.institute.classesOffered || "";
-
-          let classesArr = [];
-          // Handle range like "1-10"
-          const rangeMatch = classesStr.match(/^(\d+)-(\d+)$/);
-          if (rangeMatch) {
-            const start = parseInt(rangeMatch[1]);
-            const end = parseInt(rangeMatch[2]);
-            for (let i = start; i <= end; i++) {
-              classesArr.push(`Class ${i}`);
-            }
-          } else {
-            classesArr = classesStr.split(',').map(c => c.trim()).filter(c => c);
+          const maxClass = response.data.institute.maxClass || 0;
+          const classesArr = [];
+          for (let i = 1; i <= maxClass; i++) {
+            classesArr.push(`Class ${i}`);
           }
-
           setInstituteClasses(classesArr.map(c => ({ label: c, value: c })));
         }
       }

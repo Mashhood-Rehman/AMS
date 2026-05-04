@@ -38,17 +38,17 @@ async function main() {
 
   const institute = await prisma.institute.upsert({
     where: { principalId: principal.id },
-    update: { classesOffered: '1-10' },
+    update: { maxClass: 10 },
     create: {
       name: 'The Educators',
-      classesOffered: '1-10',
+      maxClass: 10,
       principalId: principal.id
     }
   });
 
   await prisma.user.update({
     where: { id: principal.id },
-    data: { instituteId: institute.id }
+    data: { institute: { connect: { id: institute.id } } }
   });
 
   // Create a Teacher
@@ -60,7 +60,7 @@ async function main() {
       password: commonPassword,
       name: 'Dr. Smith',
       role: 'TEACHER',
-      instituteId: institute.id,
+      institute: { connect: { id: institute.id } },
       permissions: ['dashboard', 'attendance', 'students', 'courses', 'reports'],
     },
   });
@@ -72,7 +72,7 @@ async function main() {
     create: {
       name: 'Computer Science 101',
       code: 'CS101',
-      teacherId: teacher.id,
+      teacher: { connect: { id: teacher.id } },
     },
   });
 
@@ -92,7 +92,7 @@ async function main() {
         password: commonPassword,
         name: s.name,
         role: 'STUDENT',
-        instituteId: institute.id,
+        institute: { connect: { id: institute.id } },
         className: 'Class 5'
       },
     });

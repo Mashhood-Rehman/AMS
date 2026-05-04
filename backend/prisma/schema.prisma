@@ -67,7 +67,7 @@ model User {
 model Institute {
   id             String   @id @default(uuid())
   name           String
-  classesOffered String
+  maxClass       Int      @default(0)
   address        String?
   phone          String?
   principalId    Int      @unique

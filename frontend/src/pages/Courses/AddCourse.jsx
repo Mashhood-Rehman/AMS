@@ -66,8 +66,11 @@ const AddCourse = ({ courseId, onSuccess }) => {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.data.success) {
-          const classesStr = response.data.institute.classesOffered || "";
-          const classesArr = classesStr.split(',').map(c => c.trim()).filter(c => c);
+          const maxClass = response.data.institute.maxClass || 0;
+          const classesArr = [];
+          for (let i = 1; i <= maxClass; i++) {
+            classesArr.push(`Class ${i}`);
+          }
           setInstituteClasses(classesArr);
         }
       }

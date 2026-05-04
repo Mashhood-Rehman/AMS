@@ -23,12 +23,8 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email already in use' });
     }
 
-    // Get the creator's info
     const creator = await prisma.user.findUnique({ where: { id: req.userId } });
 
-    // Logic for instituteId:
-    // If Admin creates a Principal, they might provide an instituteId or it might be set later.
-    // If a Principal creates a Teacher/Student, we use the Principal's instituteId.
     let targetInstituteId = instituteId || null;
     if (creator.role === 'PRINCIPAL') {
       targetInstituteId = creator.instituteId;
@@ -46,7 +42,7 @@ export const createUser = async (req, res) => {
         phone,
         status: status || 'ACTIVE',
         role: (role || 'STUDENT').toUpperCase(),
-        instituteId: targetInstituteId,
+        ...(targetInstituteId ? { institute: { connect: { id: targetInstituteId } } } : {}),
         createdBy: req.userId,
         taughtCourses: (role === 'TEACHER' || role === 'PRINCIPAL') && courseIds ? {
           connect: courseIds.map(id => ({ id: parseInt(id) }))
@@ -89,7 +85,7 @@ export const updateUser = async (req, res) => {
       phone: phone !== undefined ? phone : targetUser.phone,
       status: status || targetUser.status,
       role: role ? role.toUpperCase() : targetUser.role,
-      instituteId: instituteId || targetUser.instituteId,
+      ...(instituteId ? { institute: { connect: { id: instituteId } } } : {}),
       permissions: permissions !== undefined ? { set: permissions } : undefined,
       className: className !== undefined ? className : targetUser.className,
     };
