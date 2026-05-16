@@ -100,6 +100,7 @@ export const getAllAttendance = async (req, res) => {
       studentId,
       courseId,
       status,
+      className,
       date,
       startDate,
       endDate,
@@ -112,6 +113,7 @@ export const getAllAttendance = async (req, res) => {
     if (studentId) where.studentId = parseInt(studentId);
     if (courseId)  where.courseId  = parseInt(courseId);
     if (status)    where.status    = status;
+    if (className) where.student = { className };
 
     // Date filtering
     if (date) {

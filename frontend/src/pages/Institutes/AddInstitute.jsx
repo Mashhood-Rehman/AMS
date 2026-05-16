@@ -34,13 +34,19 @@ const AddInstitute = () => {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    if (storedUser.role === 'STUDENT') {
+      navigate('/dashboard/institutes/list');
+      return;
+    }
+
     fetchPrincipals();
     if (isEditMode) {
       fetchInstituteDetails();
     } else if (location.state?.principalId) {
       setFormData(prev => ({ ...prev, principalId: location.state.principalId }));
     }
-  }, [id, location.state]);
+  }, [id, location.state, navigate, isEditMode]);
 
   const fetchPrincipals = async () => {
     try {

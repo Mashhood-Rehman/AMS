@@ -25,6 +25,14 @@ const AddUser = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditMode = !!id;
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isStudent = user.role === 'STUDENT';
+
+  useEffect(() => {
+    if (isStudent) {
+      navigate('/dashboard/students');
+    }
+  }, [isStudent, navigate]);
 
   const [formData, setFormData] = useState({
     name: '',

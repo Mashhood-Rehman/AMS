@@ -120,17 +120,23 @@ export const updateUser = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const { role, courseId, status, instituteId: filterInstituteId } = req.query;
+    const { role, courseId, status, instituteId: filterInstituteId, className: filterClassName } = req.query;
 
     const requester = await prisma.user.findUnique({ where: { id: req.userId } });
-    console.log(`[getAllUsers] requester=${requester?.id} role=${requester?.role} roleFilter=${role} courseId=${courseId} status=${status} instituteId=${filterInstituteId}`);
 
     const where = {};
     if (role) where.role = role.toUpperCase();
     if (status) where.status = status.toUpperCase();
+    if (filterClassName) where.className = filterClassName;
 
     if (requester.role === 'PRINCIPAL') {
       where.instituteId = requester.instituteId;
+    } else if (requester.role === 'STUDENT') {
+      if (requester.className) {
+        where.className = requester.className;
+      } else {
+        where.id = requester.id;
+      }
     } else if (filterInstituteId) {
       where.instituteId = filterInstituteId;
     }
@@ -152,10 +158,11 @@ export const getAllUsers = async (req, res) => {
         }
       };
 
-      if (courseClassName) {
-        where.OR = [enrollmentFilter, { className: courseClassName }];
+      const courseFilter = courseClassName ? { OR: [enrollmentFilter, { className: courseClassName }] } : enrollmentFilter;
+      if (requester.role === 'STUDENT') {
+        where.AND = [...(where.AND || []), courseFilter];
       } else {
-        Object.assign(where, enrollmentFilter);
+        Object.assign(where, courseFilter);
       }
     }
 

@@ -3,7 +3,25 @@ import { prisma } from '../db.js';
 // Get all courses (with teacher info)
 export const getAllCourses = async (req, res) => {
   try {
+    const { className } = req.query;
+    const requester = await prisma.user.findUnique({ where: { id: req.userId } });
+
+    const where = {};
+    if (className) {
+      where.className = className;
+    } else if (requester?.role === 'STUDENT') {
+      const orFilters = [];
+      if (requester.className) {
+        orFilters.push({ className: requester.className });
+      }
+      orFilters.push({ enrollments: { some: { studentId: requester.id } } });
+      if (orFilters.length > 0) {
+        where.OR = orFilters;
+      }
+    }
+
     const courses = await prisma.course.findMany({
+      where,
       include: {
         teacher: {
           select: {

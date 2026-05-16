@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import DashboardLayout from './layouts/DashboardLayout';
 import AuthLayout from './layouts/AuthLayout';
@@ -19,12 +19,32 @@ import StudentsList from './pages/Students/StudentsList';
 
 import Attendance from './pages/Attendance/Attendance';
 import MarkAttendance from './pages/Attendance/MarkAttendance';
+import AttendanceList from './pages/Attendance/AttendanceList';
+import { api } from './api';
 
 // Placeholder components for future development
 const Reports = () => <div className="stat-card"><h2>System Reports</h2><p>Feature coming soon...</p></div>;
 const Settings = () => <div className="stat-card"><h2>Settings</h2><p>Feature coming soon...</p></div>;
 
 function App() {
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await api.getMe();
+        console.log('User data from getMe:', response.user);
+        if (response.success) {
+          localStorage.setItem('user', JSON.stringify(response.user));
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+      }
+    };
+
+    if (localStorage.getItem('token')) {
+      fetchUser();
+    }
+  }, []);
+
   return (
     <>
       <Router>
@@ -41,7 +61,8 @@ function App() {
             <Route index element={<Dashboard />} />
 
             <Route path="attendance" element={<Attendance />}>
-              <Route index element={<Navigate to="mark" replace />} />
+              <Route index element={<Navigate to="list" replace />} />
+              <Route path="list" element={<AttendanceList />} />
               <Route path="mark" element={<MarkAttendance />} />
             </Route>
 

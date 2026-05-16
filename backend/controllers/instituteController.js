@@ -47,6 +47,29 @@ export const createInstitute = async (req, res) => {
 // Get All Institutes
 export const getAllInstitutes = async (req, res) => {
   try {
+    const requester = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true, instituteId: true }
+    });
+
+    if (requester?.role === 'STUDENT') {
+      if (!requester.instituteId) {
+        return res.json({ success: true, institutes: [] });
+      }
+      const institute = await prisma.institute.findUnique({
+        where: { id: requester.instituteId },
+        include: {
+          principal: {
+            select: { id: true, name: true, email: true }
+          },
+          _count: {
+            select: { users: true, courses: true }
+          }
+        }
+      });
+      return res.json({ success: true, institutes: institute ? [institute] : [] });
+    }
+
     const institutes = await prisma.institute.findMany({
       include: {
         principal: {

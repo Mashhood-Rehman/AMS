@@ -1,9 +1,10 @@
 import React from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { ClipboardCheck, List, BarChart2 } from 'lucide-react';
+import { Outlet, NavLink } from 'react-router-dom';
+import { ClipboardCheck, List } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
 
 const tabs = [
+  { label: 'Attendance List', path: '/dashboard/attendance/list', icon: <List size={16} /> },
   { label: 'Mark Attendance', path: '/dashboard/attendance/mark', icon: <ClipboardCheck size={16} /> },
 ];
 

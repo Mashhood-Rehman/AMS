@@ -68,7 +68,6 @@ export const api = {
     }
   },
 
-  // ── Attendance ──────────────────────────────────────────────────────────────
   markAttendance: async (data) => {
     try {
       const response = await apiInstance.post('/attendance', data);
@@ -141,10 +140,18 @@ export const api = {
     }
   },
 
-  // ── Courses & Users (helpers for attendance forms) ──────────────────────────
-  getCourses: async () => {
+  getCourses: async (params = {}) => {
     try {
-      const response = await apiInstance.get('/courses');
+      const response = await apiInstance.get('/courses', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getInstituteById: async (id) => {
+    try {
+      const response = await apiInstance.get(`/institutes/${id}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Network error or server unavailable' };

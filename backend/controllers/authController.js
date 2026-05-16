@@ -35,7 +35,7 @@ export const signup = async (req, res) => {
     res.status(201).json({
       success: true,
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role }
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, className: user.className }
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -70,7 +70,8 @@ export const login = async (req, res) => {
         name: user.name, 
         role: user.role, 
         permissions: user.permissions || [], 
-        instituteId: user.instituteId 
+        instituteId: user.instituteId,
+        className: user.className
       }
     });
   } catch (error) {
@@ -89,7 +90,8 @@ export const getMe = async (req, res) => {
         role: true,
         permissions: true,
         instituteId: true,
-        createdAt: true
+        createdAt: true,
+        className: true
       }
     });
 
@@ -97,6 +99,7 @@ export const getMe = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    console.log('GetMe User:', user);
     res.json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

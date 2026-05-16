@@ -15,7 +15,9 @@ const Navbar = ({ toggleSidebar }) => {
         >
           <Menu size={24} />
         </button>
-        <h2 className="text-lg font-semibold tracking-tight">Admin Panel</h2>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {user?.role === 'ADMIN' ? 'Admin Panel' : 'Student Portal'}
+        </h2>
       </div>
 
       <div className="flex items-center gap-4">

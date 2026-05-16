@@ -15,13 +15,32 @@ const Sidebar = ({ isSidebarOpen }) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userPermissions = user.permissions || [];
 
-  const filteredNavItems = navItems.filter(item => {
-    const excludedForAdmin = ['students', 'courses', 'attendance'];
-    if (user.role === 'ADMIN' && excludedForAdmin.includes(item.permissionKey)) {
-      return false;
-    }
-    return user.role === 'ADMIN' || userPermissions.includes(item.permissionKey);
-  });
+  const filteredNavItems = navItems
+    .filter(item => {
+      const excludedForAdmin = ['students', 'courses', 'attendance'];
+      if (user.role === 'ADMIN' && excludedForAdmin.includes(item.permissionKey)) {
+        return false;
+      }
+      return user.role === 'ADMIN' || userPermissions.includes(item.permissionKey);
+    })
+    .map((item) => {
+      if (user.role === 'STUDENT') {
+        if (item.permissionKey === 'institutes') {
+          return {
+            ...item,
+            subTabs: item.subTabs?.filter(sub => sub.path !== '/dashboard/institutes/add') || []
+          };
+        }
+
+        if (item.permissionKey === 'courses') {
+          return {
+            ...item,
+            subTabs: item.subTabs?.filter(sub => sub.path !== '/dashboard/courses/add-course') || []
+          };
+        }
+      }
+      return item;
+    });
 
   const toggleMenu = (title) => {
     setOpenMenus(prev => ({

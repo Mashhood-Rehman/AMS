@@ -59,7 +59,10 @@ const MarkAttendance = () => {
   const [courseDetails, setCourseDetails] = useState(null);
 
   useEffect(() => {
-    api.getCourses()
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const params = user.role === 'STUDENT' && user.className ? { className: user.className } : {};
+    
+    api.getCourses(params)
       .then(d => setCourses(d.courses || []))
       .catch(() => { });
   }, []);
@@ -82,7 +85,11 @@ const MarkAttendance = () => {
           api.getAttendanceByCourse(selectedCourse, { date }),
         ]);
 
-        const studentList = usersResponse.users || [];
+        let studentList = usersResponse.users || [];
+        const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (loggedInUser.role === 'STUDENT') {
+          studentList = studentList.filter(s => s.id === loggedInUser.id);
+        }
         const attendanceList = attendanceResponse.attendance || [];
         const courseInfo = attendanceResponse.course || courses.find(c => String(c.id) === String(selectedCourse));
 

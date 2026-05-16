@@ -4,6 +4,8 @@ import CustomTable from '../../components/constantComponents/CustomTable';
 import Icons from '../../assets/icons';
 
 const CoursesList = ({ onEdit }) => {
+  const userRole = JSON.parse(localStorage.getItem('user') || '{}').role;
+  const isStudent = userRole === 'STUDENT';
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,7 +16,13 @@ const CoursesList = ({ onEdit }) => {
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/courses', {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const params = new URLSearchParams();
+      if (isStudent && user.className) {
+        params.append('className', user.className);
+      }
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const response = await axios.get(`http://localhost:5000/api/courses${query}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -72,7 +80,7 @@ const CoursesList = ({ onEdit }) => {
         </div>
       )
     },
-    {
+    ...(!isStudent ? [{
       key: 'actions',
       label: 'Actions',
       render: (_, item) => (
@@ -93,7 +101,7 @@ const CoursesList = ({ onEdit }) => {
           </button>
         </div>
       )
-    }
+    }] : [])
   ];
 
   return (

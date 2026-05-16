@@ -17,19 +17,29 @@ const InstitutesList = () => {
   const navigate = useNavigate();
   const [institutes, setInstitutes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState({});
 
   useEffect(() => {
-    fetchInstitutes();
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    setUser(storedUser);
+    fetchInstitutes(storedUser);
   }, []);
 
-  const fetchInstitutes = async () => {
+  const fetchInstitutes = async (currentUser) => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/institutes', {
+      const baseUrl = 'http://localhost:5000/api/institutes';
+      const url = currentUser?.role === 'STUDENT' && currentUser?.instituteId
+        ? `${baseUrl}/${currentUser.instituteId}`
+        : baseUrl;
+
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
+
       if (response.data.success) {
-        const flattened = response.data.institutes.map(inst => ({
+        const data = response.data.institutes ? response.data.institutes : [response.data.institute].filter(Boolean);
+        const flattened = data.map(inst => ({
           ...inst,
           principalName: inst.principal?.name || 'N/A'
         }));
@@ -52,7 +62,7 @@ const InstitutesList = () => {
       });
       if (response.data.success) {
         toast.success('Institute deleted successfully');
-        fetchInstitutes();
+        fetchInstitutes(user);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete institute');
@@ -87,7 +97,7 @@ const InstitutesList = () => {
         </span>
       )
     },
-    {
+    ...(user.role !== 'STUDENT' ? [{
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
@@ -114,7 +124,7 @@ const InstitutesList = () => {
           </button>
         </div>
       )
-    }
+    }] : []),
   ];
 
   return (
@@ -124,6 +134,7 @@ const InstitutesList = () => {
         title="Institutes Directory"
         subtitle="Manage all registered institutes and their principals."
         button={
+        user.role !== 'STUDENT' ? (
           <button
             onClick={() => navigate('/dashboard/institutes/add')}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-dark text-white rounded-lg font-bold shadow-lg shadow-brand-dark/20 hover:bg-brand-hover active:scale-[0.98] transition-all"
@@ -131,7 +142,8 @@ const InstitutesList = () => {
             <Plus size={20} />
             Add Institute
           </button>
-        }
+        ) : null
+      }
       />
 
       {/* Table Section */}

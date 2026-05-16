@@ -7,6 +7,8 @@ import Icons from '../../assets/icons';
 
 const StudentsList = () => {
   const navigate = useNavigate();
+  const userRole = JSON.parse(localStorage.getItem('user') || '{}').role;
+  const isStudent = userRole === 'STUDENT';
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,11 +19,18 @@ const StudentsList = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/users?role=STUDENT', {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const params = new URLSearchParams();
+      params.append('role', 'STUDENT');
+      if (isStudent && user.className) {
+        params.append('className', user.className);
+      }
+      const response = await axios.get(`http://localhost:5000/api/users?${params.toString()}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
-        setStudents(response.data.users);
+        const filteredUsers = response.data.users.filter(u => u.id !== user.id);
+        setStudents(filteredUsers);
       }
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -66,7 +75,7 @@ const StudentsList = () => {
       label: 'Enrollment Date',
       render: (val) => new Date(val).toLocaleDateString()
     },
-    {
+    ...(!isStudent ? [{
       key: 'actions',
       label: 'Actions',
       render: (_, item) => (
@@ -87,7 +96,7 @@ const StudentsList = () => {
           </button>
         </div>
       )
-    }
+    }] : [])
   ];
 
   return (
@@ -95,14 +104,14 @@ const StudentsList = () => {
       <SectionHeader 
         title="Student Records"
         subtitle="View and manage student profiles and academic statuses."
-        button={
-          <button
-            onClick={() => navigate('/dashboard/user-logs/add-user')}
-            className="btn btn-blue"
-          >
-            Enroll Student
-          </button>
-        }
+        button={!isStudent ? (
+        <button
+          onClick={() => navigate('/dashboard/user-logs/add-user')}
+          className="btn btn-blue"
+        >
+          Enroll Student
+        </button>
+      ) : null}
       />
 
       <div className="bg-white rounded-lg border-0 p-1 mt-6 overflow-hidden">
