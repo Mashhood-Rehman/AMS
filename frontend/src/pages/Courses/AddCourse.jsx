@@ -44,7 +44,7 @@ const AddCourse = ({ courseId, onSuccess }) => {
   const fetchCourseDetails = async () => {
     setFetching(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/courses/${courseId}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/courses/${courseId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -68,7 +68,7 @@ const AddCourse = ({ courseId, onSuccess }) => {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const instituteId = user.instituteId;
       if (instituteId) {
-        const response = await axios.get(`http://localhost:5000/api/institutes/${instituteId}`, {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/institutes/${instituteId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.data.success) {
@@ -113,8 +113,8 @@ const AddCourse = ({ courseId, onSuccess }) => {
 
     try {
       const url = isEditMode
-        ? `http://localhost:5000/api/courses/${courseId}`
-        : `http://localhost:5000/api/courses`;
+        ? `${import.meta.env.VITE_API_URL}/courses/${courseId}`
+        : `${import.meta.env.VITE_API_URL}/courses`;
 
       const method = isEditMode ? 'put' : 'post';
 

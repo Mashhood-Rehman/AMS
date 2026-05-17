@@ -37,7 +37,7 @@ const EditProfile = () => {
   const fetchUser = async () => {
     setFetching(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/users`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/users`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -81,7 +81,7 @@ const EditProfile = () => {
       const payload = { ...formData };
       if (!payload.password) delete payload.password;
 
-      const response = await axios.put(`http://localhost:5000/api/users/${userId}`, payload, {
+      const response = await axios.put(`${import.meta.env.VITE_API_URL}/users/${userId}`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 

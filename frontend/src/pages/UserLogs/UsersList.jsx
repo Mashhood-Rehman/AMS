@@ -17,7 +17,7 @@ const UsersList = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/users', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/users`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -33,7 +33,7 @@ const UsersList = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        const response = await axios.delete(`http://localhost:5000/api/users/${id}`, {
+        const response = await axios.delete(`${import.meta.env.VITE_API_URL}/users/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.data.success) {

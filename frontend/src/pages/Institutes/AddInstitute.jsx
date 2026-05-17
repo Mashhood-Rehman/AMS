@@ -50,7 +50,7 @@ const AddInstitute = () => {
 
   const fetchPrincipals = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/users?role=PRINCIPAL', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/users?role=PRINCIPAL`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -68,7 +68,7 @@ const AddInstitute = () => {
 
   const fetchInstituteDetails = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/institutes/${id}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/institutes/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -108,8 +108,8 @@ const AddInstitute = () => {
     setLoading(true);
     try {
       const url = isEditMode
-        ? `http://localhost:5000/api/institutes/${id}`
-        : 'http://localhost:5000/api/institutes';
+        ? `${import.meta.env.VITE_API_URL}/institutes/${id}`
+        : `${import.meta.env.VITE_API_URL}/institutes`;
 
       const method = isEditMode ? 'put' : 'post';
 

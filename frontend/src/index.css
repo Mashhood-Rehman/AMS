@@ -156,3 +156,30 @@ body {
 .btn-cancel:hover {
   background-color: var(--slate-300);
 }
+
+.goog-te-gadget span {
+  display: none !important;
+}
+
+.goog-te-gadget {
+  color: transparent !important;
+  font-size: 0px;
+}
+
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+#google_translate_element select {
+  background: #ffffff;
+  color: #000000;
+  border: none;
+  outline: none;
+  border-radius: 8px;
+  padding: 8px 6px;
+  border: 1px solid var(--light-gray);
+  width: 100%;
+  max-width: 180px;
+  box-sizing: border-box;
+}

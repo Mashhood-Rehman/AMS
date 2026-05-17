@@ -28,7 +28,7 @@ const InstitutesList = () => {
   const fetchInstitutes = async (currentUser) => {
     setLoading(true);
     try {
-      const baseUrl = 'http://localhost:5000/api/institutes';
+      const baseUrl = `${import.meta.env.VITE_API_URL}/institutes`;
       const url = currentUser?.role === 'STUDENT' && currentUser?.instituteId
         ? `${baseUrl}/${currentUser.instituteId}`
         : baseUrl;
@@ -57,7 +57,7 @@ const InstitutesList = () => {
     if (!window.confirm('Are you sure you want to delete this institute?')) return;
 
     try {
-      const response = await axios.delete(`http://localhost:5000/api/institutes/${id}`, {
+      const response = await axios.delete(`${import.meta.env.VITE_API_URL}/institutes/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {

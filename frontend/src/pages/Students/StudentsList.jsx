@@ -25,7 +25,7 @@ const StudentsList = () => {
       if (isStudent && user.className) {
         params.append('className', user.className);
       }
-      const response = await axios.get(`http://localhost:5000/api/users?${params.toString()}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/users?${params.toString()}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -42,7 +42,7 @@ const StudentsList = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this student record?')) {
       try {
-        const response = await axios.delete(`http://localhost:5000/api/users/${id}`, {
+        const response = await axios.delete(`${import.meta.env.VITE_API_URL}/users/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.data.success) {

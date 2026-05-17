@@ -17,7 +17,7 @@ const Dashboard = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/users/dashboard/stats', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/users/dashboard/stats`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -111,7 +111,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
-      <SectionHeader 
+      <SectionHeader
         title="System Overview"
         subtitle={getGreeting()}
         button={

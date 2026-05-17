@@ -1,5 +1,6 @@
 import React from 'react';
 import { Menu, User } from 'lucide-react';
+import GoogleTranslator from './GoogleTranslator';
 
 const Navbar = ({ toggleSidebar }) => {
   const userStr = localStorage.getItem('user');
@@ -21,6 +22,7 @@ const Navbar = ({ toggleSidebar }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        <GoogleTranslator />
         {user ? (
           <div className="hidden sm:block text-right">
             <p className="text-sm font-bold leading-none">{user.name}</p>

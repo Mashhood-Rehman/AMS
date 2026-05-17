@@ -75,7 +75,7 @@ const AddUser = () => {
 
   const fetchCourses = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/courses', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/courses`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -94,7 +94,7 @@ const AddUser = () => {
 
       const instituteId = user.instituteId;
       if (instituteId) {
-        const response = await axios.get(`http://localhost:5000/api/institutes/${instituteId}`, {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/institutes/${instituteId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.data.success) {
@@ -114,7 +114,7 @@ const AddUser = () => {
   const fetchUser = async () => {
     setFetching(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/users`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/users`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -186,8 +186,8 @@ const AddUser = () => {
     setLoading(true);
     try {
       const url = isEditMode
-        ? `http://localhost:5000/api/users/${id}`
-        : `http://localhost:5000/api/users`;
+        ? `${import.meta.env.VITE_API_URL}/users/${id}`
+        : `${import.meta.env.VITE_API_URL}/users`;
 
       const method = isEditMode ? 'put' : 'post';
 

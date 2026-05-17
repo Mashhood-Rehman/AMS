@@ -22,7 +22,7 @@ const CoursesList = ({ onEdit }) => {
         params.append('className', user.className);
       }
       const query = params.toString() ? `?${params.toString()}` : '';
-      const response = await axios.get(`http://localhost:5000/api/courses${query}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/courses${query}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
@@ -38,7 +38,7 @@ const CoursesList = ({ onEdit }) => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this course?')) {
       try {
-        const response = await axios.delete(`http://localhost:5000/api/courses/${id}`, {
+        const response = await axios.delete(`${import.meta.env.VITE_API_URL}/courses/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.data.success) {
