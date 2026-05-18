@@ -15,14 +15,39 @@ const statusIcon = {
   ABSENT: <XCircle size={14} />,
 };
 
-const parseCourseTime = (time) => {
+const getDayName = (dateStr) => {
+  if (!dateStr) return '';
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dateObj = new Date(y, m - 1, d);
+  return days[dateObj.getDay()];
+};
+
+const parseCourseTime = (time, selectedDate) => {
   if (!time) return null;
-  const trimmed = time.trim();
-  const ampmMatch = trimmed.match(/\s?(am|pm)$/i);
-  let normalized = trimmed;
+  let resolvedTime = time.trim();
+
+  // If time is a serialized JSON map of daily times
+  if (resolvedTime.startsWith('{')) {
+    try {
+      const parsedMap = JSON.parse(resolvedTime);
+      const dayName = getDayName(selectedDate);
+      if (dayName && parsedMap[dayName]) {
+        resolvedTime = parsedMap[dayName].trim();
+      } else {
+        return null; // No teaching time for this day
+      }
+    } catch (e) {
+      console.error('Failed to parse daily course times:', e);
+      return null;
+    }
+  }
+
+  const ampmMatch = resolvedTime.match(/\s?(am|pm)$/i);
+  let normalized = resolvedTime;
 
   if (ampmMatch) {
-    const [timePart, period] = trimmed.split(' ');
+    const [timePart, period] = resolvedTime.split(' ');
     const [hour, minute] = timePart.split(':').map(Number);
     let hrs = hour;
     if (period.toUpperCase() === 'PM' && hour !== 12) hrs += 12;
@@ -37,7 +62,7 @@ const parseCourseTime = (time) => {
 
 const isGracePeriodOver = (courseTimeStr, selectedDate) => {
   if (!courseTimeStr || !selectedDate) return false;
-  const parsed = parseCourseTime(courseTimeStr);
+  const parsed = parseCourseTime(courseTimeStr, selectedDate);
   if (!parsed) return false;
 
   const [y, mo, d] = selectedDate.split('-').map(Number);
@@ -327,7 +352,7 @@ const MarkAttendance = () => {
         {isStudentRole && selectedCourse && (
           <button
             onClick={() => setShowQRModal(true)}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2.5 rounded-lg active:scale-95 transition-all shadow-sm cursor-pointer h-[42px] self-end animate-pulse"
+            className="btn btn-blue"
           >
             <QrCode size={16} />
             Get Check-in QR
@@ -474,35 +499,35 @@ const MarkAttendance = () => {
       {/* Dynamic QR Code Modal */}
       {showQRModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-100 max-w-md w-full shadow-2xl p-6 relative overflow-hidden flex flex-col items-center">
+          <div className="bg-white rounded-2xl border border-slate-100 max-w-sm w-full shadow-2xl p-5 relative overflow-hidden flex flex-col items-center">
 
             {/* Elegant Header */}
-            <div className="w-full flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
+            <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3 mb-3.5">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">
+                <h3 className="text-base font-bold text-slate-800">
                   {isStudentRole ? 'My Check-in QR Code' : 'Dynamic Attendance QR'}
                 </h3>
-                <p className="text-xs text-slate-400 font-medium">
+                <p className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
                   {isStudentRole ? 'Scan with your phone to mark attendance' : 'Scannable check-in for students'}
                 </p>
               </div>
               <button
                 onClick={() => setShowQRModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
             {/* Content / Info Card */}
-            <div className="w-full bg-slate-50 border border-slate-200/60 rounded-xl p-4 mb-5 text-center">
-              <span className="text-xs font-semibold text-brand-dark bg-blue-50 px-2.5 py-1 rounded-full">
+            <div className="w-full bg-slate-50 border border-slate-200/60 rounded-xl p-3 mb-3.5 text-center">
+              <span className="text-[10px] font-semibold text-brand-dark bg-blue-50 px-2 py-0.5 rounded-full">
                 {courses.find(c => String(c.id) === String(selectedCourse))?.name || 'Course'}
               </span>
-              <h4 className="text-sm font-bold text-slate-700 mt-2">
+              <h4 className="text-xs font-bold text-slate-700 mt-1.5">
                 Scan QR to Automatically Mark Present
               </h4>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
                 {isStudentRole
                   ? "Open your phone's camera, scan the QR code, and log in to verify your identity."
                   : 'Dynamic code expires & rotates automatically.'}
@@ -510,69 +535,69 @@ const MarkAttendance = () => {
             </div>
 
             {/* QR Display */}
-            <div className="relative p-3 bg-gradient-to-tr from-slate-100 to-white border border-slate-200/80 rounded-2xl shadow-inner mb-5 flex items-center justify-center min-h-[260px] min-w-[260px]">
+            <div className="relative p-2 bg-gradient-to-tr from-slate-100 to-white border border-slate-200/80 rounded-xl shadow-inner mb-3.5 flex items-center justify-center min-h-[200px] min-w-[200px]">
               {qrLoading || !qrToken ? (
-                <div className="flex flex-col items-center gap-2 text-slate-400">
-                  <RefreshCcw size={24} className="animate-spin text-brand-dark" />
-                  <span className="text-xs">Generating dynamic token...</span>
+                <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                  <RefreshCcw size={20} className="animate-spin text-brand-dark" />
+                  <span className="text-[10px]">Generating dynamic token...</span>
                 </div>
               ) : (
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                     `${window.location.origin}/#/check-in?courseId=${selectedCourse}&token=${qrToken}`
                   )}`}
                   alt="Attendance Scan QR Code"
-                  className="w-[240px] h-[240px] rounded-lg select-none"
+                  className="w-[180px] h-[180px] rounded-lg select-none"
                 />
               )}
 
               {/* Pulsing indicator */}
-              <div className="absolute top-3 right-3 flex h-2 w-2">
+              <div className="absolute top-2.5 right-2.5 flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </div>
             </div>
 
             {/* Status display / real-time counts */}
             {isStudentRole ? (
-              <div className="w-full border-t border-slate-100 pt-5">
+              <div className="w-full border-t border-slate-100 pt-3.5">
                 {records[0]?.status === 'PRESENT' ? (
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center flex flex-col items-center animate-fade-in-up">
-                    <div className="inline-flex items-center justify-center p-1.5 bg-emerald-500 rounded-full text-white mb-2 shadow-sm shadow-emerald-500/25">
-                      <CheckCircle size={16} />
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center flex flex-col items-center animate-fade-in-up">
+                    <div className="inline-flex items-center justify-center p-1 bg-emerald-500 rounded-full text-white mb-1 shadow-sm shadow-emerald-500/25">
+                      <CheckCircle size={14} />
                     </div>
-                    <p className="text-sm font-extrabold text-emerald-800 leading-tight">PRESENT</p>
-                    <p className="text-xs text-emerald-600 mt-1 font-medium">Your attendance has been successfully recorded!</p>
+                    <p className="text-xs font-extrabold text-emerald-800 leading-tight">PRESENT</p>
+                    <p className="text-[10px] text-emerald-600 mt-0.5 font-medium leading-tight">Your attendance has been successfully recorded!</p>
                   </div>
                 ) : (
-                  <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-4 text-center flex flex-col items-center">
-                    <div className="inline-flex items-center justify-center p-1.5 bg-amber-500 rounded-full text-white mb-2 animate-bounce">
-                      <RefreshCcw size={16} className="animate-spin text-amber-500 bg-white rounded-full p-0.5" style={{ animationDuration: '3s' }} />
+                  <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2.5 text-center flex flex-col items-center">
+                    <div className="inline-flex items-center justify-center p-1 bg-amber-500 rounded-full text-white mb-1 animate-bounce">
+                      <RefreshCcw size={14} className="animate-spin text-amber-500 bg-white rounded-full p-0.5" style={{ animationDuration: '3s' }} />
                     </div>
-                    <p className="text-sm font-extrabold text-amber-800 leading-tight">PENDING SCAN</p>
-                    <p className="text-xs text-slate-500 mt-1 font-medium">Waiting for you to scan this code on your mobile phone...</p>
+                    <p className="text-xs font-extrabold text-amber-800 leading-tight">PENDING SCAN</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium leading-tight">Waiting for you to scan this code on your mobile phone...</p>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="w-full grid grid-cols-2 gap-4 border-t border-slate-100 pt-5 text-center">
-                <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3">
-                  <p className="text-[20px] font-extrabold text-emerald-600 leading-none">
+              <div className="w-full grid grid-cols-2 gap-3 border-t border-slate-100 pt-3.5 text-center">
+                <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-2">
+                  <p className="text-base font-extrabold text-emerald-600 leading-none">
                     {records.filter(r => r.status === 'PRESENT').length}
                   </p>
-                  <p className="text-xs font-semibold text-emerald-800 mt-1">Checked In</p>
+                  <p className="text-[10px] font-semibold text-emerald-800 mt-0.5">Checked In</p>
                 </div>
-                <div className="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
-                  <p className="text-[20px] font-extrabold text-slate-500 leading-none">
+                <div className="bg-slate-50/60 border border-slate-100 rounded-xl p-2">
+                  <p className="text-base font-extrabold text-slate-500 leading-none">
                     {records.filter(r => r.status === 'PENDING').length}
                   </p>
-                  <p className="text-xs font-semibold text-slate-500 mt-1">Pending Scan</p>
+                  <p className="text-[10px] font-semibold text-slate-500 mt-0.5">Pending Scan</p>
                 </div>
               </div>
             )}
 
             {/* Live activity ticker */}
-            <div className="w-full mt-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-400">
+            <div className="w-full mt-2.5 flex items-center justify-center gap-1.5 text-[10px] font-medium text-slate-400">
               <span className={`inline-block h-1.5 w-1.5 rounded-full animate-pulse ${(isStudentRole && records[0]?.status === 'PRESENT') ? 'bg-emerald-500' : 'bg-brand-dark'}`}></span>
               <span>
                 {isStudentRole

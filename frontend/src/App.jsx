@@ -23,7 +23,7 @@ import AttendanceList from './pages/Attendance/AttendanceList';
 import CheckIn from './pages/Attendance/CheckIn';
 import { api } from './api';
 
-const Reports = () => <div className="stat-card"><h2>System Reports</h2><p>Feature coming soon...</p></div>;
+import Reports from './pages/Reports/Reports';
 const Settings = () => <div className="stat-card"><h2>Settings</h2><p>Feature coming soon...</p></div>;
 
 function App() {

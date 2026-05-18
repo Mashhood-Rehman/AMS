@@ -3,6 +3,21 @@ import axios from 'axios';
 import CustomTable from '../../components/constantComponents/CustomTable';
 import Icons from '../../assets/icons';
 
+const renderCourseTime = (timeStr) => {
+  if (!timeStr) return '';
+  try {
+    if (timeStr.startsWith('{')) {
+      const parsed = JSON.parse(timeStr);
+      return Object.entries(parsed)
+        .map(([day, time]) => `${day.substring(0, 3)}: ${time}`)
+        .join(', ');
+    }
+  } catch (e) {
+    console.error('Failed to parse course time', e);
+  }
+  return timeStr;
+};
+
 const CoursesList = ({ onEdit }) => {
   const userRole = JSON.parse(localStorage.getItem('user') || '{}').role;
   const isStudent = userRole === 'STUDENT';
@@ -75,7 +90,7 @@ const CoursesList = ({ onEdit }) => {
               </span>
             ))}
           </div>
-          {item.time && <span className="text-[10px] text-slate-400 font-medium">{item.time}</span>}
+          {item.time && <span className="text-[10px] text-slate-400 font-medium">{renderCourseTime(item.time)}</span>}
           {!item.time && (!item.days || item.days.length === 0) && <span className="text-[10px] text-slate-300 italic">Not set</span>}
         </div>
       )

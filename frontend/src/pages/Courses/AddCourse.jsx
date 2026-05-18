@@ -23,6 +23,9 @@ const AddCourse = ({ courseId, onSuccess }) => {
     time: ''
   });
 
+  const [useDifferentTimes, setUseDifferentTimes] = useState(false);
+  const [dayTimes, setDayTimes] = useState({});
+
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const [loading, setLoading] = useState(false);
@@ -37,6 +40,8 @@ const AddCourse = ({ courseId, onSuccess }) => {
       fetchCourseDetails();
     } else {
       setFormData({ name: '', code: '', className: '', days: [], time: '' });
+      setUseDifferentTimes(false);
+      setDayTimes({});
       setFetching(false);
     }
   }, [courseId]);
@@ -48,13 +53,27 @@ const AddCourse = ({ courseId, onSuccess }) => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
+        const course = response.data.course;
+        let isJson = false;
+        let parsedDayTimes = {};
+        try {
+          if (course.time && course.time.startsWith('{')) {
+            parsedDayTimes = JSON.parse(course.time);
+            isJson = true;
+          }
+        } catch (e) {
+          console.error('Failed to parse day-specific times', e);
+        }
+
         setFormData({
-          name: response.data.course.name,
-          code: response.data.course.code,
-          className: response.data.course.className || '',
-          days: response.data.course.days || [],
-          time: response.data.course.time || ''
+          name: course.name,
+          code: course.code,
+          className: course.className || '',
+          days: course.days || [],
+          time: isJson ? '' : (course.time || '')
         });
+        setUseDifferentTimes(isJson);
+        setDayTimes(parsedDayTimes);
       }
     } catch (err) {
       setError('Failed to fetch course details');
@@ -91,6 +110,14 @@ const AddCourse = ({ courseId, onSuccess }) => {
     if (error) setError('');
   };
 
+  const handleDayTimeChange = (day, value) => {
+    setDayTimes(prev => ({
+      ...prev,
+      [day]: value
+    }));
+    if (error) setError('');
+  };
+
   const toggleDay = (day) => {
     setFormData(prev => {
       const days = prev.days.includes(day)
@@ -118,8 +145,33 @@ const AddCourse = ({ courseId, onSuccess }) => {
 
       const method = isEditMode ? 'put' : 'post';
 
+      let finalTime = formData.time;
+      if (useDifferentTimes && formData.days.length > 0) {
+        const filteredDayTimes = {};
+        formData.days.forEach(day => {
+          filteredDayTimes[day] = dayTimes[day] || '';
+        });
+
+        // Validate that each active teaching day has a custom start time
+        const missingTime = formData.days.some(day => !filteredDayTimes[day]);
+        if (missingTime) {
+          setError('Please specify a start time for all selected teaching days.');
+          setLoading(false);
+          return;
+        }
+
+        finalTime = JSON.stringify(filteredDayTimes);
+      } else {
+        if (!formData.time) {
+          setError('Please specify a start time.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const payload = {
         ...formData,
+        time: finalTime,
         instituteId: JSON.parse(localStorage.getItem('user') || '{}').instituteId
       };
 
@@ -247,20 +299,59 @@ const AddCourse = ({ courseId, onSuccess }) => {
               </div>
             </div>
 
-            {/* Teaching Time */}
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="block text-sm font-bold text-slate-700 ml-1">Start Time</label>
-              <div className="relative group">
+            {/* Toggle: Use different times per day */}
+            {formData.days.length > 0 && (
+              <div className="md:col-span-2 flex items-center gap-2.5 px-1 py-1">
                 <input
-                  type="time"
-                  name="time"
-                  value={formData.time}
-                  onChange={handleInputChange}
-                  className="custom_input"
+                  type="checkbox"
+                  id="useDifferentTimes"
+                  checked={useDifferentTimes}
+                  onChange={(e) => {
+                    setUseDifferentTimes(e.target.checked);
+                    if (error) setError('');
+                  }}
+                  className="h-4.5 w-4.5 rounded border-slate-300 text-brand-active focus:ring-brand-active cursor-pointer"
                 />
+                <label htmlFor="useDifferentTimes" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                  Set different start times for each teaching day
+                </label>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium ml-1">Specify the time this class usually starts.</p>
-            </div>
+            )}
+
+            {/* Teaching Time(s) */}
+            {useDifferentTimes && formData.days.length > 0 ? (
+              <div className="md:col-span-2 space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/60 animate-fade-in">
+                <label className="block text-sm font-bold text-slate-700 ml-0.5">Start Times per Day</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {formData.days.map(day => (
+                    <div key={day} className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-sm">
+                      <span className="text-xs font-extrabold text-slate-600">{day}</span>
+                      <input
+                        type="time"
+                        value={dayTimes[day] || ''}
+                        onChange={(e) => handleDayTimeChange(day, e.target.value)}
+                        className="custom_input py-1.5 px-3 max-w-[130px]"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium ml-0.5">Specify a custom time for each day the class is taught.</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="block text-sm font-bold text-slate-700 ml-1">Start Time</label>
+                <div className="relative group">
+                  <input
+                    type="time"
+                    name="time"
+                    value={formData.time}
+                    onChange={handleInputChange}
+                    className="custom_input"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium ml-1">Specify the time this class usually starts.</p>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 flex items-center justify-end gap-3">

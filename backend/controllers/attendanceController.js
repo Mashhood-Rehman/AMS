@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import crypto from 'crypto';
+import { sendLowAttendanceEmail, sendManualAttendanceEmail } from '../utils/emailService.js';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -631,4 +632,382 @@ export const markAttendanceQR = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to record QR attendance.', error: error.message });
   }
 };
+
+// ─── Low Attendance Email Alert System ───────────────────────────────────────
+
+const countExpectedClasses = (courseDays, startStr, endStr) => {
+  if (!courseDays || !courseDays.length || !startStr || !endStr) return 0;
+
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return 0;
+
+  let count = 0;
+  const current = new Date(start);
+
+  const daysMap = {
+    'Sunday': 0,
+    'Monday': 1,
+    'Tuesday': 2,
+    'Wednesday': 3,
+    'Thursday': 4,
+    'Friday': 5,
+    'Saturday': 6
+  };
+
+  const targetDayIndices = courseDays.map(d => daysMap[d]).filter(idx => idx !== undefined);
+
+  while (current <= end) {
+    if (targetDayIndices.includes(current.getDay())) {
+      count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+};
+
+/**
+ * POST /api/attendance/send-low-alerts
+ * Body: { courseId, className, month, year, bypassDateCheck? }
+ */
+export const sendLowAttendanceAlerts = async (req, res) => {
+  try {
+    const { courseId, className, month, year, bypassDateCheck } = req.body;
+
+    if (!courseId || !className || !month || !year) {
+      return res.status(400).json({
+        success: false,
+        message: 'courseId, className, month, and year are required.',
+      });
+    }
+
+    const currentDay = new Date().getDate();
+    // Only allow on the 25th of the month unless bypassDateCheck is true
+    if (currentDay !== 25 && !bypassDateCheck) {
+      return res.status(400).json({
+        success: false,
+        message: 'Low attendance notification emails can only be sent on the 25th day of the month to ensure a representative monthly attendance summary.',
+      });
+    }
+
+    // 1. Fetch the course
+    const course = await prisma.course.findUnique({
+      where: { id: parseInt(courseId) },
+    });
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found.' });
+    }
+
+    // 2. Fetch active students in the class
+    const students = await prisma.user.findMany({
+      where: {
+        role: 'STUDENT',
+        className: className,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (students.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No active students found in this class.',
+        sentCount: 0,
+        sentTo: []
+      });
+    }
+
+    // 3. Resolve start & end date for the selected month/year
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+
+    const startDateStr = firstDay.toISOString().split('T')[0];
+    const endDateStr = lastDay.toISOString().split('T')[0];
+
+    // 4. Calculate expected classes using countExpectedClasses
+    const expectedClasses = countExpectedClasses(course.days || [], startDateStr, endDateStr);
+
+    if (expectedClasses === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No scheduled teaching sessions found for this course in the selected month/year. Cannot calculate attendance rate.',
+      });
+    }
+
+    // 5. Fetch all attendance records for these students in this course & month
+    const studentIds = students.map(s => s.id);
+    const attendanceRecords = await prisma.attendance.findMany({
+      where: {
+        courseId: parseInt(courseId),
+        studentId: { in: studentIds },
+        date: {
+          gte: new Date(Date.UTC(year, month - 1, 1)),
+          lte: new Date(Date.UTC(year, month, 0, 23, 59, 59)),
+        },
+      },
+    });
+
+    // Map records for quick lookup
+    const recordsMap = {};
+    attendanceRecords.forEach(rec => {
+      if (!recordsMap[rec.studentId]) {
+        recordsMap[rec.studentId] = [];
+      }
+      recordsMap[rec.studentId].push(rec);
+    });
+
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const monthName = monthNames[month - 1];
+
+    let sentCount = 0;
+    const sentTo = [];
+
+    // 6. Calculate rate and send warning emails for students below 80%
+    for (const student of students) {
+      const studentRecs = recordsMap[student.id] || [];
+      let present = 0;
+      let late = 0;
+
+      studentRecs.forEach(rec => {
+        if (rec.status === 'PRESENT') present++;
+        else if (rec.status === 'LATE') late++;
+      });
+
+      const rate = Math.round(((present + late) / expectedClasses) * 100);
+
+      // Low attendance warning threshold is less than 80%
+      if (rate < 80) {
+        // Send email alert
+        const emailResult = await sendLowAttendanceEmail(
+          student.email,
+          student.name,
+          rate,
+          monthName,
+          course.name
+        );
+
+        if (emailResult.success) {
+          sentCount++;
+          sentTo.push({ id: student.id, name: student.name, email: student.email, rate });
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully processed monthly low-attendance system. Sent warning emails to ${sentCount} students.`,
+      sentCount,
+      sentTo,
+    });
+
+  } catch (error) {
+    console.error('[sendLowAttendanceAlerts] Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error.',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * GET /api/attendance/student-summary/:studentId
+ * Returns student profile details and course-by-course attendance summary
+ */
+export const getStudentAttendanceSummary = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // 1. Fetch student profile
+    const student = await prisma.user.findUnique({
+      where: { id: parseInt(studentId) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        status: true,
+        className: true,
+        createdAt: true,
+      }
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    // 2. Fetch courses either enrolled or matching className
+    const courses = await prisma.course.findMany({
+      where: {
+        OR: [
+          { enrollments: { some: { studentId: student.id } } },
+          student.className ? { className: student.className } : null
+        ].filter(Boolean)
+      },
+      include: {
+        teacher: { select: { id: true, name: true } }
+      }
+    });
+
+    // 3. For each course, aggregate attendance metrics
+    const summary = [];
+
+    for (const course of courses) {
+      const records = await prisma.attendance.findMany({
+        where: {
+          studentId: student.id,
+          courseId: course.id,
+        }
+      });
+
+      let present = 0;
+      let late = 0;
+      let absent = 0;
+
+      records.forEach(rec => {
+        if (rec.status === 'PRESENT') present++;
+        else if (rec.status === 'LATE') late++;
+        else if (rec.status === 'ABSENT') absent++;
+      });
+
+      // Calculate expected classes from student creation or course creation, whichever is later
+      const startRange = course.createdAt > student.createdAt ? course.createdAt : student.createdAt;
+      const today = new Date();
+      const expected = countExpectedClasses(course.days || [], startRange.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+
+      const rate = expected > 0 ? Math.round(((present + late) / expected) * 100) : 100;
+
+      summary.push({
+        courseId: course.id,
+        courseName: course.name,
+        courseCode: course.code,
+        teacherName: course.teacher?.name || 'N/A',
+        expected,
+        present,
+        late,
+        absent,
+        rate
+      });
+    }
+
+    return res.json({
+      success: true,
+      student,
+      summary
+    });
+  } catch (error) {
+    console.error('[getStudentAttendanceSummary] Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch student attendance summary.', error: error.message });
+  }
+};
+
+/**
+ * POST /api/attendance/send-manual-alert
+ * Dispatches a manual attendance report email to a student
+ */
+export const sendManualAttendanceAlert = async (req, res) => {
+  try {
+    const { studentId, customMessage } = req.body;
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'studentId is required.' });
+    }
+
+    // 1. Fetch student
+    const student = await prisma.user.findUnique({
+      where: { id: parseInt(studentId) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        status: true,
+        className: true,
+        createdAt: true,
+      }
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    // 2. Fetch courses either enrolled or matching className
+    const courses = await prisma.course.findMany({
+      where: {
+        OR: [
+          { enrollments: { some: { studentId: student.id } } },
+          student.className ? { className: student.className } : null
+        ].filter(Boolean)
+      },
+      include: {
+        teacher: { select: { id: true, name: true } }
+      }
+    });
+
+    // 3. For each course, aggregate attendance metrics
+    const summary = [];
+
+    for (const course of courses) {
+      const records = await prisma.attendance.findMany({
+        where: {
+          studentId: student.id,
+          courseId: course.id,
+        }
+      });
+
+      let present = 0;
+      let late = 0;
+      let absent = 0;
+
+      records.forEach(rec => {
+        if (rec.status === 'PRESENT') present++;
+        else if (rec.status === 'LATE') late++;
+        else if (rec.status === 'ABSENT') absent++;
+      });
+
+      // Calculate expected classes from student creation or course creation, whichever is later
+      const startRange = course.createdAt > student.createdAt ? course.createdAt : student.createdAt;
+      const today = new Date();
+      const expected = countExpectedClasses(course.days || [], startRange.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+
+      const rate = expected > 0 ? Math.round(((present + late) / expected) * 100) : 100;
+
+      summary.push({
+        courseId: course.id,
+        courseName: course.name,
+        courseCode: course.code,
+        teacherName: course.teacher?.name || 'N/A',
+        expected,
+        present,
+        late,
+        absent,
+        rate
+      });
+    }
+
+    // 4. Send email
+    const emailResult = await sendManualAttendanceEmail(student.email, student.name, summary, customMessage);
+
+    if (!emailResult.success) {
+      return res.status(500).json({ success: false, message: 'Failed to send manual warning email.' });
+    }
+
+    return res.json({
+      success: true,
+      message: `Successfully sent manual attendance report/alert email to ${student.name} (${student.email}).`
+    });
+  } catch (error) {
+    console.error('[sendManualAttendanceAlert] Error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error.', error: error.message });
+  }
+};
+
+
+
 

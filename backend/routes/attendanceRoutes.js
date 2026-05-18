@@ -11,6 +11,9 @@ import {
   getAttendanceSummary,
   getQRToken,
   markAttendanceQR,
+  sendLowAttendanceAlerts,
+  getStudentAttendanceSummary,
+  sendManualAttendanceAlert,
 } from '../controllers/attendanceController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
@@ -30,6 +33,11 @@ router.get('/summary', getAttendanceSummary);
 // ── Scoped Access ─────────────────────────────────────────────────────────────
 router.get('/course/:courseId',   getAttendanceByCourse);
 router.get('/student/:studentId', getAttendanceByStudent);
+router.get('/student-summary/:studentId', getStudentAttendanceSummary);
+
+// ── Alerts / Warning Triggers ─────────────────────────────────────────────────
+router.post('/send-low-alerts', sendLowAttendanceAlerts);
+router.post('/send-manual-alert', sendManualAttendanceAlert);
 
 // ── Bulk Mark ─────────────────────────────────────────────────────────────────
 router.post('/bulk', bulkMarkAttendance);

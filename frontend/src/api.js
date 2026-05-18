@@ -184,6 +184,33 @@ export const api = {
       throw error.response?.data || { message: 'Network error or server unavailable' };
     }
   },
+
+  sendLowAttendanceAlerts: async (data) => {
+    try {
+      const response = await apiInstance.post('/attendance/send-low-alerts', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getStudentAttendanceSummary: async (studentId) => {
+    try {
+      const response = await apiInstance.get(`/attendance/student-summary/${studentId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  sendManualAttendanceAlert: async (data) => {
+    try {
+      const response = await apiInstance.post('/attendance/send-manual-alert', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
 };
 
 export default api;

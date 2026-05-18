@@ -48,7 +48,6 @@ export const navItems = [
   { title: 'Students', icon: <Users size={20} />, path: '/dashboard/students', permissionKey: 'students' },
 
   { title: 'Reports', icon: <FileText size={20} />, path: '/dashboard/reports', permissionKey: 'reports' },
-  { title: 'Settings', icon: <Settings size={20} />, path: '/dashboard/settings', permissionKey: 'settings' },
   { title: 'Edit Profile', icon: <User size={20} />, path: '/dashboard/profile', permissionKey: 'edit-profile' },
 
 ];
