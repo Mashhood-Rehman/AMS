@@ -21,10 +21,13 @@ import Attendance from './pages/Attendance/Attendance';
 import MarkAttendance from './pages/Attendance/MarkAttendance';
 import AttendanceList from './pages/Attendance/AttendanceList';
 import CheckIn from './pages/Attendance/CheckIn';
+import EmbedAttendance from './pages/Attendance/EmbedAttendance';
 import { api } from './api';
 
+
 import Reports from './pages/Reports/Reports';
-const Settings = () => <div className="stat-card"><h2>Settings</h2><p>Feature coming soon...</p></div>;
+import Settings from './pages/Settings/Settings';
+
 
 function App() {
   useEffect(() => {
@@ -58,6 +61,8 @@ function App() {
           </Route>
 
           <Route path="/check-in" element={<CheckIn />} />
+          <Route path="/embed/attendance" element={<EmbedAttendance />} />
+
 
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />

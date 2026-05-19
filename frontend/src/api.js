@@ -211,6 +211,34 @@ export const api = {
       throw error.response?.data || { message: 'Network error or server unavailable' };
     }
   },
+
+  getLmsConfig: async () => {
+    try {
+      const response = await apiInstance.get('/lms/config');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  updateLmsConfig: async (data) => {
+    try {
+      const response = await apiInstance.post('/lms/config', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  verifyLmsEmbed: async (params) => {
+    try {
+      const response = await apiInstance.get('/lms/verify-embed', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
 };
 
 export default api;
+

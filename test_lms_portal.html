@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LMS Integration Testing Portal</title>
+  <!-- Google Fonts & Tailwind-like visual excellence -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #07384d;
+      --accent: #00d2ff;
+      --success: #10b981;
+      --bg-slate: #0b132b;
+      --card-bg: #1c2541;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-slate);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: rgba(28, 37, 65, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 2.25rem;
+      height: 2.25rem;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 1.2rem;
+    }
+
+    .brand-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.025em;
+    }
+
+    .brand-tag {
+      background: rgba(0, 210, 255, 0.15);
+      color: var(--accent);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(0, 210, 255, 0.2);
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      padding: 1.5rem;
+      gap: 1.5rem;
+      height: calc(100vh - 70px);
+    }
+
+    .sidebar {
+      background-color: var(--card-bg);
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      color: white;
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0, 210, 255, 0.15);
+    }
+
+    .quick-select {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+      margin-top: 0.25rem;
+    }
+
+    .btn-quick {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+      color: var(--text);
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.5rem;
+      border-radius: 0.35rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+    }
+
+    .btn-quick:hover {
+      background: rgba(0, 210, 255, 0.1);
+      border-color: rgba(0, 210, 255, 0.3);
+      color: var(--accent);
+    }
+
+    .btn-render {
+      background: linear-gradient(135deg, #028090, #00d2ff);
+      color: white;
+      border: none;
+      padding: 0.85rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 15px rgba(0, 210, 255, 0.2);
+    }
+
+    .btn-render:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 210, 255, 0.3);
+    }
+
+    .preview-container {
+      background: #0f172a;
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .preview-header {
+      background: rgba(30, 41, 59, 0.5);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .preview-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--success);
+      border-radius: 9999px;
+      animation: pulse 1.5s infinite;
+    }
+
+    .preview-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .iframe-placeholder {
+      text-align: center;
+      max-width: 400px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .placeholder-icon {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: white;
+    }
+
+    .url-display {
+      background: rgba(11, 19, 43, 0.8);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 0.75rem 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow-x: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+      100% { transform: translateY(0px); }
+    }
+
+    .info-card {
+      background: rgba(0, 210, 255, 0.03);
+      border: 1px solid rgba(0, 210, 255, 0.1);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      font-size: 0.75rem;
+      line-height: 1.4;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">L</div>
+      <span class="brand-name">Edulink LMS Portal</span>
+      <span class="brand-tag">Simulator</span>
+    </div>
+    <div style="font-size: 0.8rem; color: var(--text-muted);">
+      FYP Attendance Embedding Proof of Concept
+    </div>
+  </header>
+
+  <main>
+    <div class="sidebar">
+      <div>
+        <h3 class="section-title">LMS Configuration</h3>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+          Configure the dynamic parameters that the LMS template will pass to the iframe.
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label for="amsUrl">AMS Base URL</label>
+        <input type="text" id="amsUrl" value="http://localhost:5173" placeholder="http://localhost:5173">
+      </div>
+
+      <div class="form-group">
+        <label for="instId">Institute ID</label>
+        <input type="text" id="instId" placeholder="Copy & Paste from AMS Settings portal..." value="">
+        <span style="font-size: 0.65rem; color: var(--accent);">Tip: Copy this from dashboard settings page</span>
+      </div>
+
+      <div class="form-group">
+        <label>Seeded Accounts (Click to Auto-fill)</label>
+        <div class="quick-select">
+          <button type="button" class="btn-quick" onclick="fillUser('teacher@ams.com', 'TEACHER')">
+            👨‍🏫 Teacher
+          </button>
+          <button type="button" class="btn-quick" onclick="fillUser('student1@ams.com', 'STUDENT')">
+            🎒 Student 1
+          </button>
+          <button type="button" class="btn-quick" onclick="fillUser('student2@ams.com', 'STUDENT')">
+            🎒 Student 2
+          </button>
+          <button type="button" class="btn-quick" onclick="fillUser('principal@ams.com', 'PRINCIPAL')">
+            👑 Principal
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Active User Email</label>
+        <input type="email" id="email" value="teacher@ams.com" placeholder="user@school.edu">
+      </div>
+
+      <div class="form-group">
+        <label for="role">User Role</label>
+        <select id="role">
+          <option value="TEACHER">TEACHER</option>
+          <option value="STUDENT">STUDENT</option>
+          <option value="PRINCIPAL">PRINCIPAL</option>
+        </select>
+      </div>
+
+      <button type="button" class="btn-render" onclick="loadIframe()">
+        Render LMS Embed Frame ⚡
+      </button>
+
+      <div class="info-card">
+        <strong>💡 Real-World Design Note:</strong><br>
+        In a university, the <code>instituteId</code> is configured once in the LMS database settings. The LMS template automatically inserts the current user's email and role to make the frame load seamlessly.
+      </div>
+    </div>
+
+    <div class="preview-container">
+      <div class="preview-header">
+        <div class="preview-title">
+          <div class="live-dot" id="liveDot" style="display: none;"></div>
+          <span id="frameState">LMS Preview Screen</span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);" id="userContext">
+          No active session
+        </div>
+      </div>
+
+      <div class="preview-body" id="previewBody">
+        <div class="iframe-placeholder" id="placeholder">
+          <div class="placeholder-icon">💻</div>
+          <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Embed Testing Sandbox</h4>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            Configure your Institute ID and credentials on the left, then click <strong>Render LMS Embed Frame</strong> to simulate the single sign-on experience.
+          </p>
+        </div>
+      </div>
+
+      <div class="url-display" id="urlDisplay">
+        iframe src = (Click Render to generate the target URL)
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Try to restore last used instituteId from local storage
+    document.addEventListener("DOMContentLoaded", () => {
+      const stored = localStorage.getItem("saved_test_institute_id");
+      if (stored) {
+        document.getElementById("instId").value = stored;
+      }
+    });
+
+    function fillUser(email, role) {
+      document.getElementById("email").value = email;
+      document.getElementById("role").value = role;
+    }
+
+    function loadIframe() {
+      const amsUrl = document.getElementById("amsUrl").value.trim().replace(/\/$/, "");
+      const instId = document.getElementById("instId").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const role = document.getElementById("role").value;
+
+      if (!instId) {
+        alert("Please enter your unique Institute ID first. You can find this on the LMS settings page in your Principal Dashboard!");
+        return;
+      }
+
+      // Save to local storage for quick testing convenience
+      localStorage.setItem("saved_test_institute_id", instId);
+
+      // Construct verified iframe query URL
+      const targetUrl = `${amsUrl}/#/embed/attendance?instituteId=${encodeURIComponent(instId)}&email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}`;
+
+      // Display URL
+      document.getElementById("urlDisplay").innerText = `iframe src = "${targetUrl}"`;
+
+      // Render the active iframe
+      const previewBody = document.getElementById("previewBody");
+      previewBody.innerHTML = `<iframe src="${targetUrl}" allow="camera; microphone"></iframe>`;
+
+      // Update UI Status
+      document.getElementById("liveDot").style.display = "block";
+      document.getElementById("frameState").innerText = "LMS Frame Active (Embedded)";
+      document.getElementById("userContext").innerHTML = `User: <strong>${email}</strong> as <span style="color: var(--accent); font-weight: bold;">${role}</span>`;
+    }
+  </script>
+</body>
+</html>

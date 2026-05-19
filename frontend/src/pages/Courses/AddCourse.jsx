@@ -203,9 +203,9 @@ const AddCourse = ({ courseId, onSuccess }) => {
   }
 
   return (
-    <div className="">
-      <div className="bg-white rounded-lg border-0 p-1">
-        <form onSubmit={handleSubmit} className="space-y-4 p-4 md:p-6 bg-slate-50/30 rounded-lg border border-slate-100">
+    <div>
+      <div>
+        <form onSubmit={handleSubmit} className="space-y-4 bg-slate-50/30 rounded-lg border border-slate-100">
           <SectionHeader
             title={isEditMode ? 'Update Academic Course' : 'Create New Course'}
             subtitle={isEditMode ? 'Modify course name and code.' : 'Register a new academic curriculum.'}
@@ -289,8 +289,8 @@ const AddCourse = ({ courseId, onSuccess }) => {
                     type="button"
                     onClick={() => toggleDay(day)}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${formData.days.includes(day)
-                        ? 'bg-brand-active text-white border-brand-active shadow-sm'
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                      ? 'bg-brand-active text-white border-brand-active shadow-sm'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
                       }`}
                   >
                     {day}

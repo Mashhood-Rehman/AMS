@@ -1,9 +1,6 @@
 import { prisma } from './db.js';
-import { neonConfig } from '@neondatabase/serverless';
-import ws from 'ws';
 import bcrypt from 'bcryptjs';
 
-neonConfig.webSocketConstructor = ws;
 
 async function main() {
   console.log('Seeding database...');
