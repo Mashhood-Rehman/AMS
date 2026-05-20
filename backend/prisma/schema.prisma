@@ -6,84 +6,63 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  ADMIN
-  TEACHER
-  STUDENT
-}
-
-enum AttendanceStatus {
-  PRESENT
-  ABSENT
-  LATE
-}
-
 model User {
-  id        Int        @id @default(autoincrement())
-  email     String     @unique
-  password  String
-  name      String
-  phone     String?
-  role      Role       @default(STUDENT)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
+  id               Int          @id @default(autoincrement())
+  email            String       @unique
+  password         String
+  name             String
+  phone            String?
+  role             Role         @default(STUDENT)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
   resetToken       String?
   resetTokenExpiry DateTime?
-
-  instituteId String?
-  institute   Institute? @relation("InstituteUsers", fields: [instituteId], references: [id])
-  
-  createdBy Int?
-  permissions String[] @default([])
-
-  taughtCourses Course[] @relation("TeacherCourses")
-
-  enrollments Enrollment[]
-  attendance  Attendance[]
-  alerts      Alert[]
-  className   String?
+  instituteId      String?
+  createdBy        Int?
+  permissions      String[]     @default([])
+  className        String?
+  alerts           Alert[]
+  attendance       Attendance[]
+  taughtCourses    Course[]     @relation("TeacherCourses")
+  enrollments      Enrollment[]
+  institute        Institute?   @relation("InstituteUsers", fields: [instituteId], references: [id])
 }
 
 model Institute {
-  id             String   @id @default(uuid())
-  name           String
-  maxClass       Int      @default(0)
-  address        String?
-  phone          String?
-  users          User[]   @relation("InstituteUsers")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  lmsSharedSecret String?
+  id               String   @id @default(uuid())
+  name             String
+  maxClass         Int      @default(0)
+  address          String?
+  phone            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lmsSharedSecret  String?
   lmsAllowedDomain String?
+  users            User[]   @relation("InstituteUsers")
 }
 
-
 model Course {
-  id          Int      @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   name        String
-  code        String   @unique
+  code        String       @unique
   teacherId   Int?
-  teacher     User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
   className   String?
-
-  days        String[]   @default([])
+  days        String[]     @default([])
   time        String?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  enrollments Enrollment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   attendance  Attendance[]
+  teacher     User?        @relation("TeacherCourses", fields: [teacherId], references: [id])
+  enrollments Enrollment[]
 }
 
 model Enrollment {
   id        Int      @id @default(autoincrement())
   studentId Int
   courseId  Int
-  student   User     @relation(fields: [studentId], references: [id])
-  course    Course   @relation(fields: [courseId], references: [id])
   createdAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id])
+  student   User     @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, courseId])
 }
@@ -97,8 +76,10 @@ model Attendance {
   status    AttendanceStatus @default(PRESENT)
   location  String?
   notes     String?
-  student   User             @relation(fields: [studentId], references: [id])
+  latitude  Float?
+  longitude Float?
   course    Course           @relation(fields: [courseId], references: [id])
+  student   User             @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, courseId, date])
 }
@@ -110,4 +91,16 @@ model Alert {
   dateTime  DateTime @default(now())
   isRead    Boolean  @default(false)
   student   User     @relation(fields: [studentId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
 }

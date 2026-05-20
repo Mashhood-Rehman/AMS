@@ -10,7 +10,7 @@ const toDateKey = (rawDate) => {
 
 export const markAttendance = async (req, res) => {
   try {
-    const { studentId, courseId, status, date, location, notes } = req.body;
+    const { studentId, courseId, status, date, location, latitude, longitude, notes } = req.body;
 
     if (!studentId || !courseId || !status) {
       return res.status(400).json({
@@ -50,6 +50,8 @@ export const markAttendance = async (req, res) => {
       update: {
         status,
         location: location ?? undefined,
+        latitude: latitude ? parseFloat(latitude) : undefined,
+        longitude: longitude ? parseFloat(longitude) : undefined,
         notes: notes ?? undefined,
         markedAt: new Date(),
       },
@@ -60,6 +62,8 @@ export const markAttendance = async (req, res) => {
         markedAt: new Date(),
         status,
         location: location ?? null,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
         notes: notes ?? null,
       },
       include: {
@@ -421,7 +425,7 @@ export const bulkMarkAttendance = async (req, res) => {
     const errors        = [];
 
     for (const record of records) {
-      const { studentId, status, location, notes } = record;
+      const { studentId, status, location, latitude, longitude, notes } = record;
 
       if (!studentId || !status) {
         errors.push({ studentId, reason: 'studentId and status are required.' });
@@ -445,6 +449,8 @@ export const bulkMarkAttendance = async (req, res) => {
           update: {
             status,
             location: location ?? undefined,
+            latitude: latitude ? parseFloat(latitude) : undefined,
+            longitude: longitude ? parseFloat(longitude) : undefined,
             notes:    notes    ?? undefined,
             markedAt: new Date(),
           },
@@ -455,6 +461,8 @@ export const bulkMarkAttendance = async (req, res) => {
             markedAt:  new Date(),
             status,
             location:  location ?? null,
+            latitude:  latitude ? parseFloat(latitude) : null,
+            longitude: longitude ? parseFloat(longitude) : null,
             notes:     notes    ?? null,
           },
         });
@@ -733,19 +741,18 @@ export const sendLowAttendanceAlerts = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Course not found.' });
     }
 
-    // 2. Fetch active students in the class
+    // 2. Fetch students in the class
     const students = await prisma.user.findMany({
       where: {
         role: 'STUDENT',
         className: className,
-        status: 'ACTIVE',
       },
     });
 
     if (students.length === 0) {
       return res.status(200).json({
         success: true,
-        message: 'No active students found in this class.',
+        message: 'No students found in this class.',
         sentCount: 0,
         sentTo: []
       });
@@ -758,8 +765,22 @@ export const sendLowAttendanceAlerts = async (req, res) => {
     const startDateStr = firstDay.toISOString().split('T')[0];
     const endDateStr = lastDay.toISOString().split('T')[0];
 
-    // 4. Calculate expected classes using countExpectedClasses
-    const expectedClasses = countExpectedClasses(course.days || [], startDateStr, endDateStr);
+    // 4. Clamp expected classes by course creation date
+    const courseCreatedDate = course.createdAt ? new Date(course.createdAt) : null;
+    let effectiveStartDate = firstDay;
+    if (courseCreatedDate && courseCreatedDate > firstDay) {
+      effectiveStartDate = courseCreatedDate;
+    }
+    if (courseCreatedDate && courseCreatedDate > lastDay) {
+      return res.status(400).json({
+        success: false,
+        message: 'Course was created after the selected month; cannot calculate attendance rate for this period.',
+      });
+    }
+    const effectiveStartDateStr = effectiveStartDate.toISOString().split('T')[0];
+
+    // 5. Calculate expected classes using countExpectedClasses
+    const expectedClasses = countExpectedClasses(course.days || [], effectiveStartDateStr, endDateStr);
 
     if (expectedClasses === 0) {
       return res.status(400).json({

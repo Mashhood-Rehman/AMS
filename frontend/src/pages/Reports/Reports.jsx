@@ -73,7 +73,8 @@ const statusShort = {
 
 const parseLocalDate = (dateStr) => {
   if (!dateStr) return null;
-  const [y, m, d] = dateStr.split('-').map(Number);
+  const dateOnly = dateStr.split('T')[0];
+  const [y, m, d] = dateOnly.split('-').map(Number);
   return new Date(y, m - 1, d);
 };
 
@@ -199,13 +200,8 @@ const Reports = () => {
           return;
         }
 
-        if (loggedInUser?.instituteId) {
-          const instituteResponse = await api.getInstituteById(loggedInUser.instituteId);
-          if (instituteResponse.success && instituteResponse.institute?.maxClass) {
-            const maxClass = instituteResponse.institute.maxClass;
-            setClasses(Array.from({ length: maxClass }, (_, idx) => `Class ${idx + 1}`));
-          }
-        }
+        // Admins and teachers should always see 10 fixed class options
+        setClasses(Array.from({ length: 10 }, (_, idx) => `Class ${idx + 1}`));
       } catch (err) {
         console.error('Failed to load report options:', err);
         setError('Failed to load filter choices. Please refresh.');
@@ -344,10 +340,22 @@ const Reports = () => {
     const activeStart = reportType === 'daily' ? singleDate : startDate;
     const activeEnd = reportType === 'daily' ? singleDate : endDate;
 
-    // Get course days
+    // Get course days and clamp expected sessions by course creation date
     const courseObj = courses.find(c => String(c.id) === String(selectedCourse));
     const courseDays = courseObj?.days || [];
-    const expectedClasses = countExpectedClasses(courseDays, activeStart, activeEnd);
+    const courseCreatedDate = courseObj?.createdAt ? parseLocalDate(courseObj.createdAt) : null;
+    const reportStartDate = parseLocalDate(activeStart);
+    const reportEndDate = parseLocalDate(activeEnd);
+    let effectiveStartDate = reportStartDate;
+
+    if (courseCreatedDate && reportStartDate && courseCreatedDate > reportStartDate) {
+      effectiveStartDate = courseCreatedDate;
+    }
+
+    const expectedClasses =
+      courseDays.length && effectiveStartDate && reportEndDate && (!courseCreatedDate || courseCreatedDate <= reportEndDate)
+        ? countExpectedClasses(courseDays, effectiveStartDate.toISOString().split('T')[0], activeEnd)
+        : 0;
 
     // Generate stats for each student
     const studentStats = students.map(student => {
@@ -432,7 +440,7 @@ const Reports = () => {
     const dates = processedData.uniqueDates;
 
     // Build headers
-    const headers = ['Student Name', 'Email', 'Class', ...dates.map(d => formatDateLabel(d)), 'Present', 'Late', 'Absent', 'Total Days', 'Attendance Rate (%)'];
+    const headers = ['Student Name', 'Email', 'Class', ...dates.map(d => formatDateLabel(d)), 'Present', 'Absent', 'Total Days', 'Attendance Rate (%)'];
 
     // Build rows
     const rows = filteredStudentStats.map(student => {
@@ -447,7 +455,6 @@ const Reports = () => {
         selectedClass,
         ...dateRecords,
         student.present,
-        student.late,
         student.absent,
         student.total,
         `${student.rate}%`
@@ -1071,7 +1078,6 @@ const Reports = () => {
 
                   {/* Summary Metric Headers */}
                   <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', borderLeft: '1px solid #cbd5e1', backgroundColor: '#ecfdf5', color: '#065f46' }}>P</th>
-                  <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', backgroundColor: '#fffbeb', color: '#92400e' }}>L</th>
                   <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', backgroundColor: '#fff1f2', color: '#9f1239' }}>A</th>
                   <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', backgroundColor: '#eff6ff', color: '#1e40af' }}>Expected</th>
                   <th style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', borderLeft: '1px solid #cbd5e1', color: '#1e293b' }}>Rate</th>
@@ -1125,9 +1131,6 @@ const Reports = () => {
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#059669', backgroundColor: 'rgba(236, 253, 245, 0.4)', borderBottom: '1px solid #f1f5f9', borderLeft: '1px solid #cbd5e1' }}>
                         {student.present}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#d97706', backgroundColor: 'rgba(255, 251, 235, 0.4)', borderBottom: '1px solid #f1f5f9' }}>
-                        {student.late}
-                      </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#e11d48', backgroundColor: 'rgba(255, 241, 242, 0.4)', borderBottom: '1px solid #f1f5f9' }}>
                         {student.absent}
                       </td>
@@ -1174,10 +1177,6 @@ const Reports = () => {
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', border: '1px solid #d1fae5', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: 'bold' }}>P</span>
               Present
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', border: '1px solid #fef3c7', backgroundColor: '#fffbeb', color: '#d97706', fontSize: '10px', fontWeight: 'bold' }}>L</span>
-              Late
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', border: '1px solid #ffe4e6', backgroundColor: '#fff1f2', color: '#e11d48', fontSize: '10px', fontWeight: 'bold' }}>A</span>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
-import { CheckCircle, XCircle, Save, RefreshCcw, ChevronDown, Timer, QrCode, X } from 'lucide-react';
+import { CheckCircle, XCircle, Save, RefreshCcw, ChevronDown, Timer, QrCode, X, MapPin, Loader } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
+import { getCurrentLocation } from '../../utils/geolocation';
+import { getLocationNameFromCoordinates } from '../../utils/reverseGeocode';
 
 const STATUS_OPTIONS = ['PRESENT', 'ABSENT'];
 
@@ -86,8 +88,63 @@ const MarkAttendance = () => {
   const [qrToken, setQrToken] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
 
+  // --- Location Fallback & Nominatim Autocomplete State ---
+  const [resolvedLocation, setResolvedLocation] = useState({
+    latitude: null,
+    longitude: null,
+    locationName: '',
+    source: 'PENDING', // 'PENDING' | 'GPS' | 'IP' | 'CUSTOM' | 'SAVED' | 'ERROR'
+    loading: false,
+    error: null,
+  });
   const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
   const isStudentRole = loggedInUser?.role === 'STUDENT';
+ 
+  // Automatically detect location
+  const detectLocation = async () => {
+    setResolvedLocation(prev => ({ ...prev, loading: true, error: null, source: 'PENDING' }));
+    try {
+      const loc = await getCurrentLocation();
+      let name = '';
+      if (loc.isIPBased) {
+        const parts = [];
+        if (loc.city) parts.push(loc.city);
+        if (loc.region) parts.push(loc.region);
+        if (loc.country) parts.push(loc.country);
+        name = parts.join(', ') || 'Unknown Location (IP)';
+        if (loc.isDefaultFallback) {
+          name = 'Lahore, Punjab, Pakistan1';
+        }
+      } else {
+        name = await getLocationNameFromCoordinates(loc.latitude, loc.longitude);
+      }
+
+      setResolvedLocation({
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        locationName: name,
+        source: loc.isDefaultFallback ? 'ERROR' : (loc.isIPBased ? 'IP' : 'GPS'),
+        loading: false,
+        error: loc.isDefaultFallback ? 'Browser GPS unavailable. Approximate location used.' : null,
+      });
+    } catch (err) {
+      console.error('[ATTENDANCE] Geolocation detection failed:', err);
+      setResolvedLocation({
+        latitude: null,
+        longitude: null,
+        locationName: 'Lahore, Punjab, Pakistan2',
+        source: 'ERROR',
+        loading: false,
+        error: err.message || 'Failed to detect location. Fallback active.',
+      });
+    }
+  };
+
+  // Run location detection on mount
+  useEffect(() => {
+    detectLocation();
+  }, []);
+
 
   useEffect(() => {
     if (!showQRModal || !selectedCourse) return;
@@ -278,16 +335,34 @@ const MarkAttendance = () => {
     }
 
     setSaving(true);
+
     try {
+      console.log('[ATTENDANCE] Starting attendance save with resolved location...');
+      
+      const { latitude, longitude, locationName } = resolvedLocation;
+      console.log('[ATTENDANCE] Payload Location - Lat:', latitude, 'Lon:', longitude, 'Name:', locationName);
+      
+      // Step 3: Send attendance with location
+      console.log('[ATTENDANCE] Sending attendance records with location...');
+      
       const result = await api.bulkMarkAttendance({
         courseId: parseInt(selectedCourse),
         date,
-        records: records.map((r) => ({ studentId: r.studentId, status: r.status })),
+        records: records.map((r) => ({ 
+          studentId: r.studentId, 
+          status: r.status,
+          location: locationName || 'Unknown Location',
+          latitude: latitude || null,
+          longitude: longitude || null,
+        })),
       });
-      showToast('success', `${result.saved} record(s) saved successfully.`);
+      
+      console.log('[ATTENDANCE] SUCCESS - Response:', result);
+      showToast('success', `${result.saved} record(s) saved with location.`);
       setRecords(prev => prev.map(r => ({ ...r, alreadySaved: true })));
     } catch (err) {
-      console.error('Failed to save attendance:', err);
+      console.error('[ATTENDANCE] ERROR:', err);
+      console.error('[ATTENDANCE] Error Message:', err.message);
       showToast('error', err.message || 'Failed to save attendance.');
     } finally {
       setSaving(false);
@@ -302,8 +377,12 @@ const MarkAttendance = () => {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-lg border shadow-lg text-sm font-medium transition-all ${toast.type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-600'}`}>
-          {toast.type === 'success' ? <CheckCircle size={18} /> : <XCircle size={18} />}
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-lg border shadow-lg text-sm font-medium transition-all ${
+          toast.type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 
+          toast.type === 'info' ? 'bg-white border-blue-200 text-blue-700' :
+          'bg-white border-red-200 text-red-600'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={18} /> : toast.type === 'info' ? <Loader size={18} className="animate-spin" /> : <XCircle size={18} />}
           {toast.message}
         </div>
       )}
@@ -351,6 +430,93 @@ const MarkAttendance = () => {
           </button>
         )}
       </div>
+
+      {/* --- PREMIUM LOCATION STATUS CARD --- */}
+      {selectedCourse && (
+        <div className="bg-gradient-to-r from-slate-50 to-white border border-slate-200/80 rounded-xl p-5 shadow-sm transition-all duration-300 relative overflow-hidden">
+          {/* Subtle design gradient accent */}
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-brand-dark via-blue-500 to-indigo-500"></div>
+
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className={`p-2.5 rounded-lg border shadow-sm transition-colors ${
+                resolvedLocation.loading ? 'bg-slate-50 border-slate-100' :
+                resolvedLocation.source === 'GPS' ? 'bg-emerald-50 border-emerald-100 text-emerald-600 animate-pulse' :
+                resolvedLocation.source === 'SAVED' ? 'bg-violet-50 border-violet-100 text-violet-600' :
+                resolvedLocation.source === 'CUSTOM' ? 'bg-amber-50 border-amber-100 text-amber-600' :
+                resolvedLocation.source === 'ERROR' ? 'bg-red-50 border-red-100 text-red-500' :
+                'bg-blue-50 border-blue-100 text-blue-600'
+              }`}>
+                {resolvedLocation.loading ? (
+                  <Loader className="animate-spin text-slate-400" size={20} />
+                ) : (
+                  <MapPin size={20} />
+                )}
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Attendance Location</span>
+                  
+                  {/* Styled Badge */}
+                  {resolvedLocation.loading ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 animate-pulse">
+                      Detecting...
+                    </span>
+                  ) : resolvedLocation.source === 'GPS' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Verified GPS
+                    </span>
+                  ) : resolvedLocation.source === 'SAVED' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200">
+                      Saved Location
+                    </span>
+                  ) : resolvedLocation.source === 'CUSTOM' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                      Custom Location
+                    </span>
+                  ) : resolvedLocation.source === 'ERROR' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                      Manual Fallback
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      Approximate City (IP)
+                    </span>
+                  )}
+                </div>
+
+                {resolvedLocation.loading ? (
+                  <div className="h-5 w-48 bg-slate-100 rounded animate-pulse mt-1.5"></div>
+                ) : (
+                  <h4 className="text-sm font-bold text-slate-800 mt-1">
+                    {resolvedLocation.locationName || 'Unknown Location'}
+                  </h4>
+                )}
+
+                {resolvedLocation.error && (
+                  <p className="text-[10px] text-amber-600 font-medium mt-0.5 flex items-center gap-1">
+                    <span>⚠️</span> {resolvedLocation.error}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Redetect Button */}
+            <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+              <button
+                type="button"
+                onClick={detectLocation}
+                disabled={resolvedLocation.loading || saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              >
+                <RefreshCcw size={13} className={resolvedLocation.loading ? 'animate-spin' : ''} />
+                Redetect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Student Guidance Alert */}
       {isStudentRole && selectedCourse && courseDetails && (
