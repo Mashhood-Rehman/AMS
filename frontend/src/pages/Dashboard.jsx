@@ -36,8 +36,6 @@ const Dashboard = () => {
     switch (roleName) {
       case 'ADMIN':
         return `Welcome back, Admin ${name}. Here's a system-wide snapshot today.`;
-      case 'PRINCIPAL':
-        return `Welcome back, Principal ${name}. Here's a snapshot of your institute.`;
       case 'TEACHER':
         return `Welcome back, ${name}. Here's your academic status today.`;
       case 'STUDENT':
@@ -60,8 +58,8 @@ const Dashboard = () => {
   const cards = [];
 
   if (stats) {
-    // 1. Total Students (Admin, Principal, Teacher)
-    if (roleName === 'ADMIN' || roleName === 'PRINCIPAL' || roleName === 'TEACHER') {
+    // 1. Total Students (Admin, Teacher)
+    if (roleName === 'ADMIN' || roleName === 'TEACHER') {
       cards.push({
         title: 'Total Students',
         value: stats.totalStudents ?? 0,
@@ -70,7 +68,7 @@ const Dashboard = () => {
       });
     }
 
-    // 2. Active Courses (Admin, Principal, Teacher, Student)
+    // 2. Active Courses (Admin, Teacher, Student)
     cards.push({
       title: 'Active Courses',
       value: stats.activeCourses ?? 0,
@@ -78,8 +76,8 @@ const Dashboard = () => {
       bgClass: 'bg-emerald-50 text-emerald-600',
     });
 
-    // 3. No. of Teachers (Admin, Principal)
-    if (roleName === 'ADMIN' || roleName === 'PRINCIPAL') {
+    // 3. No. of Teachers (Admin, Teacher)
+    if (roleName === 'ADMIN' || roleName === 'TEACHER') {
       cards.push({
         title: 'No. of Teachers',
         value: stats.totalTeachers ?? 0,
@@ -88,15 +86,6 @@ const Dashboard = () => {
       });
     }
 
-    // 4. No. of Principals (Admin only)
-    if (roleName === 'ADMIN') {
-      cards.push({
-        title: 'No. of Principals',
-        value: stats.totalPrincipals ?? 0,
-        icon: <Shield size={24} />,
-        bgClass: 'bg-amber-50 text-amber-600',
-      });
-    }
 
     // 5. No. of Institutes (Admin only)
     if (roleName === 'ADMIN') {

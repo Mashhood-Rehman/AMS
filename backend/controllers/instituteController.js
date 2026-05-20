@@ -2,21 +2,11 @@ import { prisma } from '../db.js';
 
 // Create Institute
 export const createInstitute = async (req, res) => {
-  const { name, maxClass, address, phone, principalId } = req.body;
+  const { name, maxClass, address, phone } = req.body;
 
   try {
-    if (!name || !maxClass || !principalId) {
-      return res.status(400).json({ success: false, message: 'Name, max class, and principal are required' });
-    }
-
-    const principal = await prisma.user.findUnique({ where: { id: parseInt(principalId) } });
-    if (!principal || principal.role !== 'PRINCIPAL') {
-      return res.status(400).json({ success: false, message: 'A valid Principal user must be selected' });
-    }
-
-    const existingInstitute = await prisma.institute.findUnique({ where: { principalId: parseInt(principalId) } });
-    if (existingInstitute) {
-      return res.status(400).json({ success: false, message: 'This Principal is already assigned to another institute' });
+    if (!name || !maxClass) {
+      return res.status(400).json({ success: false, message: 'Name and max class are required' });
     }
 
     const institute = await prisma.institute.create({
@@ -24,26 +14,19 @@ export const createInstitute = async (req, res) => {
         name,
         maxClass: parseInt(maxClass),
         address,
-        phone,
-        principalId: parseInt(principalId)
+        phone
       }
-    });
-
-    await prisma.user.update({
-      where: { id: parseInt(principalId) },
-      data: { institute: { connect: { id: institute.id } } }
     });
 
     res.status(201).json({
       success: true,
-      message: 'Institute created and Principal assigned successfully',
+      message: 'Institute created successfully',
       institute
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
   }
 };
-
 // Get All Institutes
 export const getAllInstitutes = async (req, res) => {
   try {
@@ -59,9 +42,6 @@ export const getAllInstitutes = async (req, res) => {
       const institute = await prisma.institute.findUnique({
         where: { id: requester.instituteId },
         include: {
-          principal: {
-            select: { id: true, name: true, email: true }
-          },
           _count: {
             select: { users: true, courses: true }
           }
@@ -72,9 +52,6 @@ export const getAllInstitutes = async (req, res) => {
 
     const institutes = await prisma.institute.findMany({
       include: {
-        principal: {
-          select: { id: true, name: true, email: true }
-        },
         _count: {
           select: { users: true, courses: true }
         }
@@ -93,9 +70,6 @@ export const getInstituteById = async (req, res) => {
     const institute = await prisma.institute.findUnique({
       where: { id },
       include: {
-        principal: {
-          select: { id: true, name: true, email: true, phone: true }
-        },
         users: {
           select: { id: true, name: true, role: true, email: true }
         }
@@ -116,7 +90,7 @@ export const getInstituteById = async (req, res) => {
 export const updateInstitute = async (req, res) => {
   console.log('Update Institute Request Body:', req.body);
   const { id } = req.params;
-  const { name, maxClass, address, phone, principalId } = req.body;
+  const { name, maxClass, address, phone } = req.body;
 
   try {
     const updateData = {
@@ -126,25 +100,10 @@ export const updateInstitute = async (req, res) => {
       phone
     };
 
-    if (principalId) {
-      updateData.principalId = parseInt(principalId);
-
-      // If principal changes, we need to handle the instituteId updates
-      // This is a complex case, but for now we'll just update the field
-      // and assume the user knows what they're doing.
-    }
-
     const institute = await prisma.institute.update({
       where: { id },
       data: updateData
     });
-
-    if (principalId) {
-      await prisma.user.update({
-        where: { id: parseInt(principalId) },
-        data: { institute: { connect: { id: institute.id } } }
-      });
-    }
 
     res.json({ success: true, institute });
   } catch (error) {

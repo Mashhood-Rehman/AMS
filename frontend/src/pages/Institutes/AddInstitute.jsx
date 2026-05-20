@@ -3,13 +3,10 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
   ArrowLeft,
-  Save,
   Building2,
   Phone,
   MapPin,
   Loader2,
-  Upload,
-  UserCircle,
   GraduationCap
 } from 'lucide-react';
 import SearchableDropdown from '../../components/SearchableDropdown';
@@ -22,14 +19,11 @@ const AddInstitute = () => {
   const location = useLocation();
   const isEditMode = !!id;
   const [loading, setLoading] = useState(false);
-  const [fetchingPrincipals, setFetchingPrincipals] = useState(true);
-  const [principals, setPrincipals] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     maxClass: '',
     phone: '',
-    address: '',
-    principalId: ''
+    address: ''
   });
   const [errors, setErrors] = useState({});
 
@@ -40,31 +34,10 @@ const AddInstitute = () => {
       return;
     }
 
-    fetchPrincipals();
     if (isEditMode) {
       fetchInstituteDetails();
-    } else if (location.state?.principalId) {
-      setFormData(prev => ({ ...prev, principalId: location.state.principalId }));
     }
   }, [id, location.state, navigate, isEditMode]);
-
-  const fetchPrincipals = async () => {
-    try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/users?role=PRINCIPAL`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (response.data.success) {
-        setPrincipals(response.data.users.map(u => ({
-          label: u.name,
-          value: u.id
-        })));
-      }
-    } catch (err) {
-      toast.error('Failed to fetch principals');
-    } finally {
-      setFetchingPrincipals(false);
-    }
-  };
 
   const fetchInstituteDetails = async () => {
     try {
@@ -77,8 +50,7 @@ const AddInstitute = () => {
           name: inst.name,
           maxClass: inst.maxClass,
           phone: inst.phone || '',
-          address: inst.address || '',
-          principalId: inst.principalId || ''
+          address: inst.address || ''
         });
       }
     } catch (err) {
@@ -96,7 +68,6 @@ const AddInstitute = () => {
     const newErrors = {};
     if (!formData.name) newErrors.name = 'Institute name is required';
     if (!formData.maxClass) newErrors.maxClass = 'Highest class number is required';
-    if (!formData.principalId) newErrors.principalId = 'Principal assignment is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -133,7 +104,7 @@ const AddInstitute = () => {
       {/* Header */}
       <SectionHeader
         title={isEditMode ? 'Edit Institute' : 'Setup New Institute'}
-        subtitle={isEditMode ? 'Update institute information and principal.' : 'Register a main branch and assign a Principal.'}
+        subtitle={isEditMode ? 'Update institute information.' : 'Register a main branch for your institute.'}
         button={
           <button
             onClick={() => navigate(-1)}
@@ -207,21 +178,6 @@ const AddInstitute = () => {
                       className="custom_input"
                     />
                   </div>
-                </div>
-
-                {/* Assign to Principal (Associate Admin slot) */}
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-slate-700 ml-1">
-                    Assign to Principal <span className="text-red-500">*</span>
-                  </label>
-                  <SearchableDropdown
-                    options={principals}
-                    value={formData.principalId}
-                    onChange={(val) => setFormData(prev => ({ ...prev, principalId: val }))}
-                    placeholder={fetchingPrincipals ? "Loading..." : "Select Principal"}
-                    isLoading={fetchingPrincipals}
-                  />
-                  {errors.principalId && <p className="text-xs text-red-500 font-bold pl-2">{errors.principalId}</p>}
                 </div>
 
                 {/* Address */}

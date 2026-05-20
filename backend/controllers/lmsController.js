@@ -4,25 +4,34 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
-// 1. Get LMS configuration for the logged-in Principal
+// 1. Get LMS configuration for the logged-in user
 // Re-generated client loaded
 export const getLmsConfig = async (req, res) => {
 
   try {
     console.log('[getLmsConfig] User requesting config. User ID:', req.userId);
-    
-    // Find the institute managed by this Principal
-    const institute = await prisma.institute.findUnique({
-      where: { principalId: req.userId },
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { instituteId: true }
     });
 
-    console.log('[getLmsConfig] Retrieved institute database record:', institute);
-
-    if (!institute) {
-      console.warn(`[getLmsConfig] No institute found for principal ID: ${req.userId}`);
+    if (!user?.instituteId) {
+      console.warn(`[getLmsConfig] No instituteId found for user ID: ${req.userId}`);
       return res.status(404).json({
         success: false,
-        message: 'No institute found for this principal account. Please create an institute first.',
+        message: 'No institute associated with this user account. Please assign an institute first.',
+      });
+    }
+
+    const institute = await prisma.institute.findUnique({
+      where: { id: user.instituteId },
+    });
+
+    if (!institute) {
+      return res.status(404).json({
+        success: false,
+        message: 'No institute found for this user account. Please assign an institute first.',
       });
     }
 
@@ -56,8 +65,17 @@ export const updateLmsConfig = async (req, res) => {
   const { lmsAllowedDomain, regenerateSecret } = req.body;
 
   try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { instituteId: true }
+    });
+
+    if (!user?.instituteId) {
+      return res.status(404).json({ success: false, message: 'Institute not found' });
+    }
+
     const institute = await prisma.institute.findUnique({
-      where: { principalId: req.userId },
+      where: { id: user.instituteId },
     });
 
     if (!institute) {

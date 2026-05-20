@@ -20,33 +20,23 @@ async function main() {
     },
   });
 
-  // Create a Principal and Institute
-  const principal = await prisma.user.upsert({
-    where: { email: 'principal@ams.com' },
-    update: { password: commonPassword },
-    create: {
-      email: 'principal@ams.com',
-      password: commonPassword,
-      name: 'Mr. Principal',
-      role: 'PRINCIPAL',
-      permissions: ['dashboard', 'attendance', 'students', 'courses', 'reports', 'settings', 'user-logs'],
-    }
-  });
-
-  const institute = await prisma.institute.upsert({
-    where: { principalId: principal.id },
-    update: { maxClass: 10 },
-    create: {
-      name: 'The Educators',
-      maxClass: 10,
-      principalId: principal.id
-    }
-  });
-
-  await prisma.user.update({
-    where: { id: principal.id },
-    data: { institute: { connect: { id: institute.id } } }
-  });
+  // Create an Institute without a principal role
+  let institute = await prisma.institute.findFirst({ where: { name: 'The Educators' } });
+  if (!institute) {
+    institute = await prisma.institute.create({
+      data: {
+        name: 'The Educators',
+        maxClass: 10,
+        address: '123 Main St',
+        phone: '+1 555 000 1111'
+      }
+    });
+  } else {
+    institute = await prisma.institute.update({
+      where: { id: institute.id },
+      data: { maxClass: 10, address: '123 Main St', phone: '+1 555 000 1111' }
+    });
+  }
 
   // Create a Teacher
   const teacher = await prisma.user.upsert({

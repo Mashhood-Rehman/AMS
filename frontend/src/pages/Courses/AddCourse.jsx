@@ -33,14 +33,25 @@ const AddCourse = ({ courseId: propCourseId, onSuccess: propOnSuccess }) => {
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+  const staticClasses = [
+  'Class 1',
+  'Class 2',
+  'Class 3',
+  'Class 4',
+  'Class 5',
+  'Class 6',
+  'Class 7',
+  'Class 8',
+  'Class 9',
+  'Class 10',
+];
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEditMode);
-  const [instituteClasses, setInstituteClasses] = useState([]);
-  const [error, setError] = useState('');
+const [instituteClasses] = useState(staticClasses);  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+
   useEffect(() => {
-    fetchInstituteClasses();
     if (isEditMode) {
       fetchCourseDetails();
     } else {
@@ -84,28 +95,6 @@ const AddCourse = ({ courseId: propCourseId, onSuccess: propOnSuccess }) => {
       setError('Failed to fetch course details');
     } finally {
       setFetching(false);
-    }
-  };
-
-  const fetchInstituteClasses = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const instituteId = user.instituteId;
-      if (instituteId) {
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/institutes/${instituteId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (response.data.success) {
-          const maxClass = response.data.institute.maxClass || 0;
-          const classesArr = [];
-          for (let i = 1; i <= maxClass; i++) {
-            classesArr.push(`Class ${i}`);
-          }
-          setInstituteClasses(classesArr);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch institute classes', err);
     }
   };
 

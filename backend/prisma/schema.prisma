@@ -8,7 +8,6 @@ datasource db {
 
 enum Role {
   ADMIN
-  PRINCIPAL
   TEACHER
   STUDENT
 }
@@ -35,8 +34,6 @@ model User {
   instituteId String?
   institute   Institute? @relation("InstituteUsers", fields: [instituteId], references: [id])
   
-  managedInstitute Institute? @relation("PrincipalOf")
-  
   createdBy Int?
   permissions String[] @default([])
 
@@ -54,8 +51,6 @@ model Institute {
   maxClass       Int      @default(0)
   address        String?
   phone          String?
-  principalId    Int      @unique
-  principal      User     @relation("PrincipalOf", fields: [principalId], references: [id])
   users          User[]   @relation("InstituteUsers")
   courses        Course[] @relation("InstituteCourses")
   createdAt      DateTime @default(now())

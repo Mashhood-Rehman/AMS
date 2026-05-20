@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../db.js';
 
-// Create User (Admin/Principal creates student/teacher)
+const REQUIRED_PERMISSIONS = ['dashboard', 'edit-profile'];
+
+// Create User (Admin creates student/teacher)
 export const createUser = async (req, res) => {
   const { email, password, name, role, phone, courseIds, instituteId, permissions, className } = req.body;
 
@@ -12,7 +14,7 @@ export const createUser = async (req, res) => {
     }
 
     // Role validation
-    const validRoles = ['ADMIN', 'PRINCIPAL', 'TEACHER', 'STUDENT'];
+    const validRoles = ['ADMIN', 'TEACHER', 'STUDENT'];
     if (role && !validRoles.includes(role.toUpperCase())) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
@@ -26,8 +28,8 @@ export const createUser = async (req, res) => {
     const creator = await prisma.user.findUnique({ where: { id: req.userId } });
 
     let targetInstituteId = instituteId || null;
-    if (creator.role === 'PRINCIPAL') {
-      targetInstituteId = creator.instituteId;
+    if (creator?.role !== 'ADMIN') {
+      targetInstituteId = creator?.instituteId || targetInstituteId;
     }
 
     // Hash password
@@ -43,12 +45,10 @@ export const createUser = async (req, res) => {
         role: (role || 'STUDENT').toUpperCase(),
         ...(targetInstituteId ? { institute: { connect: { id: targetInstituteId } } } : {}),
         createdBy: req.userId,
-        taughtCourses: (role === 'TEACHER' || role === 'PRINCIPAL') && courseIds ? {
+        taughtCourses: role === 'TEACHER' && courseIds ? {
           connect: courseIds.map(id => ({ id: parseInt(id) }))
         } : undefined,
-        permissions: permissions && permissions.length > 0 
-          ? Array.from(new Set([...permissions, 'dashboard', 'edit-profile']))
-          : ['dashboard', 'edit-profile'],
+        permissions: Array.from(new Set([...(permissions || []), ...REQUIRED_PERMISSIONS])),
         className: role === 'STUDENT' ? className : null
       },
       include: { taughtCourses: true }
@@ -75,7 +75,7 @@ export const updateUser = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const validRoles = ['ADMIN', 'PRINCIPAL', 'TEACHER', 'STUDENT'];
+    const validRoles = ['ADMIN', 'TEACHER', 'STUDENT'];
     if (role && !validRoles.includes(role.toUpperCase())) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
@@ -87,12 +87,12 @@ export const updateUser = async (req, res) => {
       role: role ? role.toUpperCase() : targetUser.role,
       ...(instituteId ? { institute: { connect: { id: instituteId } } } : {}),
       permissions: permissions !== undefined 
-        ? { set: Array.from(new Set([...permissions, 'dashboard', 'edit-profile'])) } 
+        ? { set: Array.from(new Set([...permissions, ...REQUIRED_PERMISSIONS])) } 
         : undefined,
       className: className !== undefined ? className : targetUser.className,
     };
 
-    if ((updateData.role === 'TEACHER' || updateData.role === 'PRINCIPAL') && courseIds) {
+    if (updateData.role === 'TEACHER' && courseIds) {
       updateData.taughtCourses = {
         set: courseIds.map(id => ({ id: parseInt(id) }))
       };
@@ -130,14 +130,14 @@ export const getAllUsers = async (req, res) => {
     if (role) where.role = role.toUpperCase();
     if (filterClassName) where.className = filterClassName;
 
-    if (requester.role === 'PRINCIPAL') {
-      where.instituteId = requester.instituteId;
-    } else if (requester.role === 'STUDENT') {
+    if (requester.role === 'STUDENT') {
       if (requester.className) {
         where.className = requester.className;
       } else {
         where.id = requester.id;
       }
+    } else if (requester.role === 'TEACHER') {
+      where.instituteId = requester.instituteId;
     } else if (filterInstituteId) {
       where.instituteId = filterInstituteId;
     }
@@ -221,34 +221,17 @@ export const getDashboardStats = async (req, res) => {
       stats.totalStudents = await prisma.user.count({ where: { role: 'STUDENT' } });
       stats.activeCourses = await prisma.course.count();
       stats.totalTeachers = await prisma.user.count({ where: { role: 'TEACHER' } });
-      stats.totalPrincipals = await prisma.user.count({ where: { role: 'PRINCIPAL' } });
       stats.totalInstitutes = await prisma.institute.count();
-    } else if (role === 'PRINCIPAL') {
+    } else if (role === 'TEACHER') {
       const instituteId = user.instituteId || '';
       stats.totalStudents = await prisma.user.count({
-        where: { role: 'STUDENT', instituteId: instituteId }
+        where: { role: 'STUDENT', instituteId }
       });
-      stats.activeCourses = await prisma.course.count({
-        where: { instituteId: instituteId }
-      });
-      stats.totalTeachers = await prisma.user.count({
-        where: { role: 'TEACHER', instituteId: instituteId }
-      });
-    } else if (role === 'TEACHER') {
       stats.activeCourses = await prisma.course.count({
         where: { teacherId: user.id }
       });
-      stats.totalStudents = await prisma.user.count({
-        where: {
-          role: 'STUDENT',
-          enrollments: {
-            some: {
-              course: {
-                teacherId: user.id
-              }
-            }
-          }
-        }
+      stats.totalTeachers = await prisma.user.count({
+        where: { role: 'TEACHER', instituteId }
       });
     } else if (role === 'STUDENT') {
       const instituteId = user.instituteId || '';

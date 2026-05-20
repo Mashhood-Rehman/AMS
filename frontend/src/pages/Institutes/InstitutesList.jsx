@@ -42,8 +42,7 @@ const InstitutesList = () => {
         }
 
         const flattened = data.map(inst => ({
-          ...inst,
-          principalName: inst.principal?.name || 'N/A'
+          ...inst
         }));
         setInstitutes(flattened);
       }
@@ -85,10 +84,6 @@ const InstitutesList = () => {
       )
     },
     { key: 'maxClass', label: 'Max Class' },
-    {
-      key: 'principalName',
-      label: 'Principal'
-    },
     { key: 'phone', label: 'Contact' },
     {
       key: 'address',
@@ -134,7 +129,7 @@ const InstitutesList = () => {
       {/* Header Section */}
       <SectionHeader
         title="Institutes List"
-        subtitle="Manage all registered institutes and their principals."
+        subtitle="Manage all registered institutes."
         button={
           user.role !== 'STUDENT' ? (
             <button

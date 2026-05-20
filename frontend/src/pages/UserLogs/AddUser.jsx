@@ -41,14 +41,11 @@ const AddUser = () => {
     phone: '',
     role: 'STUDENT',
     courseIds: [],
-    permissions: ['dashboard', 'edit-profile'],
+    permissions: [],
     className: ''
   });
 
   const availablePermissions = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'edit-profile', label: 'Edit Profile' },
-    { id: 'institutes', label: 'Institutes' },
     { id: 'attendance', label: 'Attendance' },
     { id: 'students', label: 'Students' },
     { id: 'courses', label: 'Courses' },
@@ -57,16 +54,27 @@ const AddUser = () => {
     { id: 'user-logs', label: 'User Logs' },
   ];
 
+  const staticClasses = [
+  { label: 'Class 1', value: 'Class 1' },
+  { label: 'Class 2', value: 'Class 2' },
+  { label: 'Class 3', value: 'Class 3' },
+  { label: 'Class 4', value: 'Class 4' },
+  { label: 'Class 5', value: 'Class 5' },
+  { label: 'Class 6', value: 'Class 6' },
+  { label: 'Class 7', value: 'Class 7' },
+  { label: 'Class 8', value: 'Class 8' },
+  { label: 'Class 9', value: 'Class 9' },
+  { label: 'Class 10', value: 'Class 10' },
+];
+
   const [courses, setCourses] = useState([]);
-  const [instituteClasses, setInstituteClasses] = useState([]);
-  const [loading, setLoading] = useState(false);
+const [instituteClasses] = useState(staticClasses);  const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEditMode);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchCourses();
-    fetchInstituteClasses();
     if (isEditMode) {
       fetchUser();
     }
@@ -87,28 +95,6 @@ const AddUser = () => {
       console.error('Failed to fetch courses', err);
     }
   };
-  const fetchInstituteClasses = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-      const instituteId = user.instituteId;
-      if (instituteId) {
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/institutes/${instituteId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (response.data.success) {
-          const maxClass = response.data.institute.maxClass || 0;
-          const classesArr = [];
-          for (let i = 1; i <= maxClass; i++) {
-            classesArr.push(`Class ${i}`);
-          }
-          setInstituteClasses(classesArr.map(c => ({ label: c, value: c })));
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch institute classes', err);
-    }
-  };
 
   const fetchUser = async () => {
     setFetching(true);
@@ -126,7 +112,7 @@ const AddUser = () => {
             phone: user.phone || '',
             role: user.role,
             courseIds: user.taughtCourses ? user.taughtCourses.map(c => c.id) : [],
-            permissions: Array.from(new Set([...(user.permissions || []), 'dashboard', 'edit-profile'])),
+            permissions: user.permissions || [],
             className: user.className || ''
           });
         }
@@ -138,11 +124,31 @@ const AddUser = () => {
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
-  };
+ const handleInputChange = (e) => {
+  const { name, value } = e.target;
+
+  // Restrict phone field to numbers only
+  if (name === 'phone') {
+    const numericValue = value.replace(/\D/g, '');
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: numericValue
+    }));
+  } else {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }
+
+  if (errors[name]) {
+    setErrors(prev => ({
+      ...prev,
+      [name]: ''
+    }));
+  }
+};
 
   const validateForm = () => {
     const newErrors = {};
@@ -199,13 +205,7 @@ const AddUser = () => {
 
       if (response.data.success) {
         toast.success(isEditMode ? 'User updated successfully' : 'User created successfully');
-
-        if (!isEditMode && formData.role === 'PRINCIPAL') {
-          const userId = response.data.user?.id;
-          navigate('/dashboard/institutes/add', { state: { principalId: userId } });
-        } else {
-          navigate('/dashboard/user-logs/users-list');
-        }
+        navigate('/dashboard/user-logs/users-list');
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Action failed');
@@ -216,20 +216,21 @@ const AddUser = () => {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const currentUserRole = currentUser.role || 'ADMIN';
 
-  const roleOptions = (currentUserRole === 'ADMIN'
-    ? [
-      { label: 'Principal', value: 'PRINCIPAL' },
-    ]
-    : [
-      { label: 'Teacher', value: 'TEACHER' },
-      { label: 'Student', value: 'STUDENT' }
-    ]
+  const roleOptions = (
+    currentUserRole === 'ADMIN'
+      ? [
+        { label: 'Teacher', value: 'TEACHER' },
+        { label: 'Student', value: 'STUDENT' }
+      ]
+      : [
+        { label: 'Teacher', value: 'TEACHER' },
+        { label: 'Student', value: 'STUDENT' }
+      ]
   );
 
   const rolePermissionMap = {
-    PRINCIPAL: availablePermissions.map(p => p.id),
-    TEACHER: ['dashboard', 'edit-profile', 'students', 'courses', 'reports', 'settings', 'institutes', 'attendance'],
-    STUDENT: ['dashboard', 'edit-profile', 'students', 'reports', 'institutes', 'attendance', 'courses']
+    TEACHER: ['students', 'courses', 'reports', 'settings', 'institutes', 'attendance'],
+    STUDENT: ['students', 'reports', 'institutes', 'attendance', 'courses']
   };
 
   // Get filtered permissions based on the role being assigned to the new/edited user
@@ -386,14 +387,19 @@ const AddUser = () => {
               </div>
 
               <div className="max-w-2xl">
-                <SearchableDropdown
-                  options={courses}
-                  value={formData.courseIds}
-                  onChange={(val) => setFormData(prev => ({ ...prev, courseIds: val }))}
-                  placeholder="Search and select multiple courses..."
-                  isMulti={true}
-                  error={errors.courses}
-                />
+               <SearchableDropdown
+                 options={courses}
+                 value={formData.courseIds}
+                 onChange={(selected) =>
+                   setFormData(prev => ({
+                     ...prev,
+                     courseIds: selected
+                   }))
+                 }
+                 placeholder="Search and select multiple courses..."
+                 isMulti={true}
+                 error={errors.courses}
+               />
               </div>
             </div>
           )}

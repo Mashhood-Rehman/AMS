@@ -43,7 +43,7 @@ const SearchableDropdown = ({
   };
 
   const selectedLabels = options
-    .filter(opt => isMulti ? value.includes(opt.value) : value === opt.value)
+    .filter(opt => isMulti ? (Array.isArray(value) && value.includes(opt.value)) : value === opt.value)
     .map(opt => opt.label);
 
   return (
@@ -60,16 +60,15 @@ const SearchableDropdown = ({
         <div className="flex flex-wrap gap-1.5 overflow-hidden">
           {selectedLabels.length > 0 ? (
             isMulti ? (
-              options.filter(opt => value.includes(opt.value)).map(opt => (
+              options.filter(opt => Array.isArray(value) && value.includes(opt.value)).map(opt => (
                 <span key={opt.value} className="bg-brand-active/10 text-brand-active text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 group animate-in fade-in zoom-in duration-200">
-                  {label}
+                  {opt.label}
                   <X
                     size={12}
                     className="hover:text-brand-hover cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const val = options.find(o => o.label === label).value;
-                      handleSelect({ value: val });
+                      handleSelect(opt);
                     }}
                   />
                 </span>
@@ -102,7 +101,7 @@ const SearchableDropdown = ({
           <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
             {filteredOptions.length > 0 ? (
               filteredOptions.map((option) => {
-                const isSelected = isMulti ? value.includes(option.value) : value === option.value;
+                const isSelected = isMulti ? (Array.isArray(value) && value.includes(option.value)) : value === option.value;
                 return (
                   <div
                     key={option.value}
