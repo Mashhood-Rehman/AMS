@@ -82,7 +82,6 @@ const MarkAttendance = () => {
   const [toast, setToast] = useState(null);
   const [courseDetails, setCourseDetails] = useState(null);
 
-  // QR Check-in states
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrToken, setQrToken] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
@@ -90,7 +89,6 @@ const MarkAttendance = () => {
   const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
   const isStudentRole = loggedInUser?.role === 'STUDENT';
 
-  // Handle QR token fetching and real-time student updates
   useEffect(() => {
     if (!showQRModal || !selectedCourse) return;
 
@@ -110,10 +108,8 @@ const MarkAttendance = () => {
 
     fetchToken();
 
-    // Refetches token every 60 seconds (safe dynamic window)
     const tokenInterval = setInterval(fetchToken, 60000);
 
-    // Live refresh student attendance records every 4 seconds
     const reloadStudents = async () => {
       try {
         const [usersResponse, attendanceResponse] = await Promise.all([
