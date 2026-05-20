@@ -63,8 +63,7 @@ function App() {
           <Route path="/check-in" element={<CheckIn />} />
           <Route path="/embed/attendance" element={<EmbedAttendance />} />
 
-
-          <Route path="/dashboard" element={<DashboardLayout />}>
+  <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />
 
             <Route path="attendance" element={<Attendance />}>

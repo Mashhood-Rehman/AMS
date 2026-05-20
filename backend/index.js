@@ -10,7 +10,6 @@ import attendanceRoutes from './routes/attendanceRoutes.js';
 import instituteRoutes from './routes/instituteRoutes.js';
 import lmsRoutes from './routes/lmsRoutes.js';
 
-
 dotenv.config();
 
 const app = express();
