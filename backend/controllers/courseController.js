@@ -8,21 +8,14 @@ export const getAllCourses = async (req, res) => {
 
     const where = {};
 
-    // Non-ADMIN users only see courses from their own institute
-    if (requester?.role !== 'ADMIN' && requester?.instituteId) {
-      where.instituteId = requester.instituteId;
-    }
-
     if (className) {
       where.className = className;
     } else if (requester?.role === 'STUDENT') {
       const orFilters = [];
       if (requester.className) {
-        orFilters.push({ className: requester.className, ...(where.instituteId ? { instituteId: where.instituteId } : {}) });
+        orFilters.push({ className: requester.className });
       }
       orFilters.push({ enrollments: { some: { studentId: requester.id } } });
-      // Remove the top-level instituteId since we put it inside orFilters
-      delete where.instituteId;
       where.OR = orFilters;
     }
 
@@ -48,7 +41,7 @@ export const getAllCourses = async (req, res) => {
 // Create a new course
 export const createCourse = async (req, res) => {
   try {
-    const { name, code, teacherId, className, instituteId, days, time } = req.body;
+    const { name, code, teacherId, className, days, time } = req.body;
 
     if (!name || !code) {
       return res.status(400).json({ success: false, message: 'Please provide name and code' });
@@ -69,7 +62,6 @@ export const createCourse = async (req, res) => {
         code,
         ...(teacherId && !isNaN(parseInt(teacherId)) ? { teacher: { connect: { id: parseInt(teacherId) } } } : {}),
         className,
-        ...(instituteId ? { institute: { connect: { id: instituteId } } } : {}),
         days: Array.isArray(days) ? days : (days ? days.split(',') : []),
         time,
       },

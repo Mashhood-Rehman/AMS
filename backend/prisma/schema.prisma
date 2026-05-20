@@ -52,7 +52,6 @@ model Institute {
   address        String?
   phone          String?
   users          User[]   @relation("InstituteUsers")
-  courses        Course[] @relation("InstituteCourses")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   lmsSharedSecret String?
@@ -66,9 +65,6 @@ model Course {
   code        String   @unique
   teacherId   Int?
   teacher     User?    @relation("TeacherCourses", fields: [teacherId], references: [id])
-  
-  instituteId String?
-  institute   Institute? @relation("InstituteCourses", fields: [instituteId], references: [id])
   className   String?
 
   days        String[]   @default([])

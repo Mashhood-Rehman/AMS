@@ -166,7 +166,6 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
       const payload = {
         ...formData,
         time: finalTime,
-        instituteId: JSON.parse(localStorage.getItem('user') || '{}').instituteId
       };
 
       const response = await axios[method](url, payload, {
@@ -180,6 +179,8 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
         }, 1500);
       }
     } catch (err) {
+      console.error('Course create error response:', err.response);
+      console.error('Course create error object:', err);
       const msg = err.response?.data?.error || err.response?.data?.message || 'Something went wrong';
       setError(msg);
     } finally {

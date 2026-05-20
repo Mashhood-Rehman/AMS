@@ -234,11 +234,9 @@ export const getDashboardStats = async (req, res) => {
         where: { role: 'TEACHER', instituteId }
       });
     } else if (role === 'STUDENT') {
-      const instituteId = user.instituteId || '';
       const className = user.className || '';
       stats.activeCourses = await prisma.course.count({
         where: {
-          instituteId: instituteId,
           className: className
         }
       });

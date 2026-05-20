@@ -62,6 +62,10 @@ export const login = async (req, res) => {
     // Generate JWT
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
 
+    const userPermissions = (user.permissions && user.permissions.length > 0)
+      ? user.permissions
+      : (user.role === 'STUDENT' ? ['dashboard', 'edit-profile'] : []);
+
     res.json({
       success: true,
       token,
@@ -70,7 +74,7 @@ export const login = async (req, res) => {
         email: user.email, 
         name: user.name, 
         role: user.role, 
-        permissions: user.permissions || [], 
+        permissions: userPermissions,
         instituteId: user.instituteId,
         className: user.className
       }
@@ -100,8 +104,12 @@ export const getMe = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    const userPermissions = (user.permissions && user.permissions.length > 0)
+      ? user.permissions
+      : (user.role === 'STUDENT' ? ['dashboard', 'edit-profile'] : []);
+
     console.log('GetMe User:', user);
-    res.json({ success: true, user });
+    res.json({ success: true, user: { ...user, permissions: userPermissions } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

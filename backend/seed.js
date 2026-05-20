@@ -80,6 +80,7 @@ async function main() {
         name: s.name,
         role: 'STUDENT',
         institute: { connect: { id: institute.id } },
+        permissions: ['dashboard', 'edit-profile'],
         className: 'Class 5'
       },
     });
