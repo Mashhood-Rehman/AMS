@@ -18,7 +18,6 @@ const InstitutesList = () => {
   const [institutes, setInstitutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState({});
-
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
     setUser(storedUser);
@@ -29,16 +28,19 @@ const InstitutesList = () => {
     setLoading(true);
     try {
       const baseUrl = `${import.meta.env.VITE_API_URL}/institutes`;
-      const url = currentUser?.role === 'STUDENT' && currentUser?.instituteId
-        ? `${baseUrl}/${currentUser.instituteId}`
-        : baseUrl;
 
-      const response = await axios.get(url, {
+      const response = await axios.get(baseUrl, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
       if (response.data.success) {
-        const data = response.data.institutes ? response.data.institutes : [response.data.institute].filter(Boolean);
+        let data = response.data.institutes ? response.data.institutes : [response.data.institute].filter(Boolean);
+
+        // Non-ADMIN users only see their own institute
+        if (currentUser?.role !== 'ADMIN' && currentUser?.instituteId) {
+          data = data.filter(inst => inst.id === currentUser.instituteId);
+        }
+
         const flattened = data.map(inst => ({
           ...inst,
           principalName: inst.principal?.name || 'N/A'

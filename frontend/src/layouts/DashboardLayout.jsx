@@ -38,7 +38,7 @@ const DashboardLayout = () => {
       )}
       <div
         className={`flex-1 flex flex-col min-h-screen w-full max-w-full min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ml-0 
-          ${isSidebarOpen ? 'md:ml-64' : 'ml-10'}`}
+          ${isSidebarOpen ? 'md:ml-64 ml-0' : 'md:ml-10 ml-0'}`}
       >
         <Navbar toggleSidebar={toggleSidebar} />
 

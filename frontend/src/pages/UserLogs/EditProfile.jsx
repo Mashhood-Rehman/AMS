@@ -86,6 +86,13 @@ const EditProfile = () => {
       });
 
       if (response.data.success) {
+        const updatedUser = {
+          ...currentUser,
+          name: response.data.user.name,
+          email: response.data.user.email,
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+
         toast.success('Profile updated successfully');
         navigate('/dashboard');
       }
@@ -115,7 +122,6 @@ const EditProfile = () => {
       <div className="w-full">
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
-            {/* Full Name - Span 2 */}
             <div className="md:col-span-2 space-y-2">
               <label className="block text-sm font-bold text-slate-700 ml-1 italic tracking-wide uppercase text-[10px] opacity-70">Full Name</label>
               <div className="relative group">
@@ -166,7 +172,7 @@ const EditProfile = () => {
               {errors.email && <p className="text-xs text-red-500 font-bold pl-2">{errors.email}</p>}
               {currentUser.role !== 'ADMIN' && (
                 <p className="text-[10px] text-slate-400 font-medium pl-1 italic mt-1">
-                  * Email can only be changed by a system administrator.
+                  * Please contact admin to update your email.
                 </p>
               )}
             </div>

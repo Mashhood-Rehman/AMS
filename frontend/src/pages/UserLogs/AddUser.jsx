@@ -40,7 +40,6 @@ const AddUser = () => {
     password: '',
     phone: '',
     role: 'STUDENT',
-    status: 'ACTIVE',
     courseIds: [],
     permissions: ['dashboard', 'edit-profile'],
     className: ''
@@ -126,7 +125,6 @@ const AddUser = () => {
             password: '',
             phone: user.phone || '',
             role: user.role,
-            status: user.status || 'ACTIVE',
             courseIds: user.taughtCourses ? user.taughtCourses.map(c => c.id) : [],
             permissions: Array.from(new Set([...(user.permissions || []), 'dashboard', 'edit-profile'])),
             className: user.className || ''
@@ -239,11 +237,7 @@ const AddUser = () => {
     (rolePermissionMap[formData.role] || []).includes(p.id)
   );
 
-  const statusOptions = [
-    { label: 'Active', value: 'ACTIVE' },
-    { label: 'Inactive', value: 'INACTIVE' },
-    { label: 'Pending', value: 'PENDING' }
-  ];
+
 
   if (fetching) {
     return (
@@ -320,16 +314,7 @@ const AddUser = () => {
               {errors.email && <p className="text-xs text-red-500 font-bold pl-2">{errors.email}</p>}
             </div>
 
-            {/* Status Selection */}
-            <div className="space-y-1">
-              <label className="block text-sm font-bold text-slate-700 ml-1">Account Status</label>
-              <SearchableDropdown
-                options={statusOptions}
-                value={formData.status}
-                onChange={(val) => setFormData(prev => ({ ...prev, status: val }))}
-                placeholder="Select Status"
-              />
-            </div>
+
 
             {/* Phone Number */}
             <div className="space-y-1">

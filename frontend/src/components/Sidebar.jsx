@@ -13,14 +13,19 @@ const Sidebar = ({ isSidebarOpen }) => {
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userPermissions = user.permissions || [];
+  const role = user.role;
 
   const filteredNavItems = navItems
     .filter(item => {
-      const excludedForAdmin = ['students', 'courses', 'attendance'];
-      if (user.role === 'ADMIN' && excludedForAdmin.includes(item.permissionKey)) {
+      if (item.hideForRoles && item.hideForRoles.includes(role)) {
         return false;
       }
-      return user.role === 'ADMIN' || userPermissions.includes(item.permissionKey);
+
+      if (item.permissionKey === 'edit-profile') {
+        return true;
+      }
+
+      return userPermissions.includes(item.permissionKey);
     })
     .map((item) => {
       if (user.role === 'STUDENT') {

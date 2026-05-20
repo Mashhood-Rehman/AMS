@@ -24,7 +24,7 @@ function createMainWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadURL('https://ams-coral-zeta.vercel.app'); // 👈 live frontend
+    mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
   }
 
   mainWindow.on('closed', () => {

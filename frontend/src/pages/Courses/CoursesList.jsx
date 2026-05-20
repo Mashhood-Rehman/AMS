@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import CustomTable from '../../components/constantComponents/CustomTable';
 import Icons from '../../assets/icons';
@@ -19,6 +20,7 @@ const renderCourseTime = (timeStr) => {
 };
 
 const CoursesList = ({ onEdit }) => {
+  const navigate = useNavigate();
   const userRole = JSON.parse(localStorage.getItem('user') || '{}').role;
   const isStudent = userRole === 'STUDENT';
   const [courses, setCourses] = useState([]);
@@ -101,7 +103,7 @@ const CoursesList = ({ onEdit }) => {
       render: (_, item) => (
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => onEdit && onEdit(item.id)}
+            onClick={() => navigate(`/dashboard/courses/edit-course/${item.id}`)}
             className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-brand-active hover:text-white transition-all shadow-sm"
             title="Edit Course"
           >

@@ -303,10 +303,6 @@ const MarkAttendance = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader
-        title="Mark Attendance"
-        subtitle={isStudentRole ? "Submit your daily attendance for this course." : "Record daily student attendance for academic courses."}
-      />
 
       {/* Toast */}
       {toast && (
@@ -349,7 +345,7 @@ const MarkAttendance = () => {
           </div>
         )}
 
-        {isStudentRole && selectedCourse && (
+        {isStudentRole && selectedCourse && records[0]?.status === 'PENDING' && (
           <button
             onClick={() => setShowQRModal(true)}
             className="btn btn-blue"
@@ -535,33 +531,35 @@ const MarkAttendance = () => {
             </div>
 
             {/* QR Display */}
-            <div className="relative p-2 bg-gradient-to-tr from-slate-100 to-white border border-slate-200/80 rounded-xl shadow-inner mb-3.5 flex items-center justify-center min-h-[200px] min-w-[200px]">
-              {qrLoading || !qrToken ? (
-                <div className="flex flex-col items-center gap-1.5 text-slate-400">
-                  <RefreshCcw size={20} className="animate-spin text-brand-dark" />
-                  <span className="text-[10px]">Generating dynamic token...</span>
-                </div>
-              ) : (
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                    `${((origin, hostname, devIP) => {
-                      if ((hostname === 'localhost' || hostname === '127.0.0.1') && devIP && devIP !== 'localhost') {
-                        return origin.replace(hostname, devIP);
-                      }
-                      return origin;
-                    })(window.location.origin, window.location.hostname, import.meta.env.VITE_DEV_IP)}/#/check-in?courseId=${selectedCourse}&token=${qrToken}`
-                  )}`}
-                  alt="Attendance Scan QR Code"
-                  className="w-[180px] h-[180px] rounded-lg select-none"
-                />
-              )}
+            {(!isStudentRole || records[0]?.status === 'PENDING') && (
+              <div className="relative p-2 bg-gradient-to-tr from-slate-100 to-white border border-slate-200/80 rounded-xl shadow-inner mb-3.5 flex items-center justify-center min-h-[200px] min-w-[200px]">
+                {qrLoading || !qrToken ? (
+                  <div className="flex flex-col items-center gap-1.5 text-slate-400">
+                    <RefreshCcw size={20} className="animate-spin text-brand-dark" />
+                    <span className="text-[10px]">Generating dynamic token...</span>
+                  </div>
+                ) : (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                      `${((origin, hostname, devIP) => {
+                        if ((hostname === 'localhost' || hostname === '127.0.0.1') && devIP && devIP !== 'localhost') {
+                          return origin.replace(hostname, devIP);
+                        }
+                        return origin;
+                      })(window.location.origin, window.location.hostname, import.meta.env.VITE_DEV_IP)}/#/check-in?courseId=${selectedCourse}&token=${qrToken}`
+                    )}`}
+                    alt="Attendance Scan QR Code"
+                    className="w-[180px] h-[180px] rounded-lg select-none"
+                  />
+                )}
 
-              {/* Pulsing indicator */}
-              <div className="absolute top-2.5 right-2.5 flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                {/* Pulsing indicator */}
+                <div className="absolute top-2.5 right-2.5 flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Status display / real-time counts */}
             {isStudentRole ? (

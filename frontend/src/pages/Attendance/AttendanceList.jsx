@@ -94,10 +94,6 @@ const AttendanceList = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader
-        title="Attendance List"
-        subtitle="Filter by class and subject to review attendance records."
-      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* Class filter: locked badge for students, dropdown for others */}

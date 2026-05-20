@@ -7,17 +7,23 @@ export const getAllCourses = async (req, res) => {
     const requester = await prisma.user.findUnique({ where: { id: req.userId } });
 
     const where = {};
+
+    // Non-ADMIN users only see courses from their own institute
+    if (requester?.role !== 'ADMIN' && requester?.instituteId) {
+      where.instituteId = requester.instituteId;
+    }
+
     if (className) {
       where.className = className;
     } else if (requester?.role === 'STUDENT') {
       const orFilters = [];
       if (requester.className) {
-        orFilters.push({ className: requester.className });
+        orFilters.push({ className: requester.className, ...(where.instituteId ? { instituteId: where.instituteId } : {}) });
       }
       orFilters.push({ enrollments: { some: { studentId: requester.id } } });
-      if (orFilters.length > 0) {
-        where.OR = orFilters;
-      }
+      // Remove the top-level instituteId since we put it inside orFilters
+      delete where.instituteId;
+      where.OR = orFilters;
     }
 
     const courses = await prisma.course.findMany({

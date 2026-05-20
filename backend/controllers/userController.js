@@ -3,7 +3,7 @@ import { prisma } from '../db.js';
 
 // Create User (Admin/Principal creates student/teacher)
 export const createUser = async (req, res) => {
-  const { email, password, name, role, phone, status, courseIds, instituteId, permissions, className } = req.body;
+  const { email, password, name, role, phone, courseIds, instituteId, permissions, className } = req.body;
 
   try {
     // Basic validation
@@ -40,7 +40,6 @@ export const createUser = async (req, res) => {
         password: hashedPassword,
         name,
         phone,
-        status: status || 'ACTIVE',
         role: (role || 'STUDENT').toUpperCase(),
         ...(targetInstituteId ? { institute: { connect: { id: targetInstituteId } } } : {}),
         createdBy: req.userId,
@@ -68,7 +67,7 @@ export const createUser = async (req, res) => {
 // Edit User
 export const updateUser = async (req, res) => {
   const { id } = req.params;
-  const { email, password, name, role, phone, status, courseIds, instituteId, permissions, className } = req.body;
+  const { email, password, name, role, phone, courseIds, instituteId, permissions, className } = req.body;
 
   try {
     const targetUser = await prisma.user.findUnique({ where: { id: parseInt(id) } });
@@ -85,7 +84,6 @@ export const updateUser = async (req, res) => {
       email: email || targetUser.email,
       name: name || targetUser.name,
       phone: phone !== undefined ? phone : targetUser.phone,
-      status: status || targetUser.status,
       role: role ? role.toUpperCase() : targetUser.role,
       ...(instituteId ? { institute: { connect: { id: instituteId } } } : {}),
       permissions: permissions !== undefined 
@@ -124,13 +122,12 @@ export const updateUser = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const { role, courseId, status, instituteId: filterInstituteId, className: filterClassName } = req.query;
+    const { role, courseId, instituteId: filterInstituteId, className: filterClassName } = req.query;
 
     const requester = await prisma.user.findUnique({ where: { id: req.userId } });
 
     const where = {};
     if (role) where.role = role.toUpperCase();
-    if (status) where.status = status.toUpperCase();
     if (filterClassName) where.className = filterClassName;
 
     if (requester.role === 'PRINCIPAL') {
@@ -178,14 +175,12 @@ export const getAllUsers = async (req, res) => {
         name: true,
         phone: true,
         role: true,
-        status: true,
         instituteId: true,
         taughtCourses: {
           select: { id: true, name: true, code: true }
         },
         permissions: true,
         className: true,
-        instituteId: true,
         createdAt: true,
         updatedAt: true
       },

@@ -47,7 +47,7 @@ export const navItems = [
   { title: 'Attendance', icon: <ClipboardCheck size={20} />, path: '/dashboard/attendance', permissionKey: 'attendance' },
   { title: 'Students', icon: <Users size={20} />, path: '/dashboard/students', permissionKey: 'students' },
 
-  { title: 'Reports', icon: <FileText size={20} />, path: '/dashboard/reports', permissionKey: 'reports' },
+  { title: 'Reports', icon: <FileText size={20} />, path: '/dashboard/reports', permissionKey: 'reports', hideForRoles: ['ADMIN'] },
   { title: 'Edit Profile', icon: <User size={20} />, path: '/dashboard/profile', permissionKey: 'edit-profile' },
-  { title: 'Settings', icon: <Settings size={20} />, path: '/dashboard/settings', permissionKey: 'settings' },
+  { title: 'Settings', icon: <Settings size={20} />, path: '/dashboard/settings', permissionKey: 'settings', hideForRoles: ['ADMIN'] },
 ];

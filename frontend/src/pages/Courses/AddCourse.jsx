@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Save,
@@ -12,7 +13,11 @@ import {
 } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
 
-const AddCourse = ({ courseId, onSuccess }) => {
+const AddCourse = ({ courseId: propCourseId, onSuccess: propOnSuccess }) => {
+  const { id: paramId } = useParams();
+  const navigate = useNavigate();
+  const courseId = propCourseId || (paramId ? parseInt(paramId) : null);
+  const onSuccess = propOnSuccess || (() => navigate(-1));
   const isEditMode = !!courseId;
 
   const [formData, setFormData] = useState({

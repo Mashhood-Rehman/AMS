@@ -2,24 +2,12 @@ import { prisma } from '../db.js';
 import crypto from 'crypto';
 import { sendLowAttendanceEmail, sendManualAttendanceEmail } from '../utils/emailService.js';
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
 
-/**
- * Normalise a date to midnight UTC so that one record exists per student/course/day.
- * Accepts a Date object, ISO string, or YYYY-MM-DD string.
- */
 const toDateKey = (rawDate) => {
   const d = rawDate ? new Date(rawDate) : new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 };
 
-// ─── Mark / Upsert Attendance ─────────────────────────────────────────────────
-
-/**
- * POST /api/attendance
- * Body: { studentId, courseId, status, date?, location?, notes? }
- * Creates or updates attendance for the given student/course/day.
- */
 export const markAttendance = async (req, res) => {
   try {
     const { studentId, courseId, status, date, location, notes } = req.body;
@@ -39,13 +27,11 @@ export const markAttendance = async (req, res) => {
       });
     }
 
-    // Verify student exists
     const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) } });
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found.' });
     }
 
-    // Verify course exists
     const course = await prisma.course.findUnique({ where: { id: parseInt(courseId) } });
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found.' });
@@ -65,11 +51,13 @@ export const markAttendance = async (req, res) => {
         status,
         location: location ?? undefined,
         notes: notes ?? undefined,
+        markedAt: new Date(),
       },
       create: {
         studentId: parseInt(studentId),
         courseId: parseInt(courseId),
         date: dateKey,
+        markedAt: new Date(),
         status,
         location: location ?? null,
         notes: notes ?? null,
@@ -458,11 +446,13 @@ export const bulkMarkAttendance = async (req, res) => {
             status,
             location: location ?? undefined,
             notes:    notes    ?? undefined,
+            markedAt: new Date(),
           },
           create: {
             studentId: parseInt(studentId),
             courseId:  parseInt(courseId),
             date:      dateKey,
+            markedAt:  new Date(),
             status,
             location:  location ?? null,
             notes:     notes    ?? null,
@@ -562,12 +552,12 @@ export const markAttendanceQR = async (req, res) => {
       });
     }
 
-    // Verify student exists and is active
+    // Verify student exists
     const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) } });
-    if (!student || student.status !== 'ACTIVE') {
+    if (!student) {
       return res.status(404).json({
         success: false,
-        message: 'Student account is not active or could not be found.',
+        message: 'Student account could not be found.',
       });
     }
 
@@ -609,12 +599,16 @@ export const markAttendanceQR = async (req, res) => {
       update: {
         status: 'PRESENT',
         notes: 'Marked automatically via QR Code scan',
+        location: req.body.location ?? undefined,
+        markedAt: new Date(),
       },
       create: {
         studentId: parseInt(studentId),
         courseId: parseInt(courseId),
         date: dateKey,
+        markedAt: new Date(),
         status: 'PRESENT',
+        location: req.body.location ?? null,
         notes: 'Marked automatically via QR Code scan',
       },
       include: {
@@ -684,7 +678,6 @@ export const sendLowAttendanceAlerts = async (req, res) => {
     }
 
     const currentDay = new Date().getDate();
-    // Only allow on the 25th of the month unless bypassDateCheck is true
     if (currentDay !== 25 && !bypassDateCheck) {
       return res.status(400).json({
         success: false,

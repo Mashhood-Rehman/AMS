@@ -478,92 +478,85 @@ const Reports = () => {
     }
 
     const toastId = toast.loading('Generating high-quality PDF report...');
-    
+
     try {
       const courseObj = courses.find(c => String(c.id) === String(selectedCourse));
       const courseName = courseObj ? courseObj.name : 'Subject';
 
       const printArea = document.getElementById('report-print-area');
       if (!printArea) {
-        toast.update(toastId, { render: 'Report container not found', type: 'error', isLoading: false, autoClose: 3000 });
-        return;
+        throw new Error('Report container not found');
       }
 
-      // Hide all elements with 'no-print' class during capture
       const noPrintElements = printArea.querySelectorAll('.no-print');
+      const hiddenElements = [];
       noPrintElements.forEach(el => {
-        el.dataset.originalDisplay = el.style.display;
+        hiddenElements.push({ el, display: el.style.display });
         el.style.display = 'none';
       });
 
-      // Expand horizontal scroll elements so table is fully captured
+      const printHeader = printArea.querySelector('.print-header-pdf');
+      const headerDisplay = printHeader ? printHeader.style.display : null;
+      if (printHeader) {
+        printHeader.style.display = 'block';
+      }
+
       const scrollContainers = printArea.querySelectorAll('.overflow-x-auto');
-      const originalStyles = [];
+      const originalScrollStyles = [];
       scrollContainers.forEach(container => {
-        originalStyles.push({
-          element: container,
+        originalScrollStyles.push({
+          el: container,
           overflowX: container.style.overflowX,
           width: container.style.width,
-          maxWidth: container.style.maxWidth
+          maxWidth: container.style.maxWidth,
         });
         container.style.overflowX = 'visible';
         container.style.width = 'auto';
         container.style.maxWidth = 'none';
       });
 
-      // Force printable header to show up during canvas capture
-      const printHeader = printArea.querySelector('.print-header-pdf');
-      if (printHeader) {
-        printHeader.style.display = 'block';
-      }
+      const A4_PX_WIDTH = 794;
+      const savedWidth = printArea.style.width;
+      const savedMinWidth = printArea.style.minWidth;
+      const savedMaxWidth = printArea.style.maxWidth;
+      printArea.style.width = `${A4_PX_WIDTH}px`;
+      printArea.style.minWidth = `${A4_PX_WIDTH}px`;
+      printArea.style.maxWidth = `${A4_PX_WIDTH}px`;
 
-      // Capture canvas
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       const canvas = await html2canvas(printArea, {
-        scale: 2, // Double resolution for ultra-sharp text in PDF
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
-        onclone: (clonedDoc) => {
-          // Fix for html2canvas oklch/oklab crash
-          const styleTags = clonedDoc.querySelectorAll('style');
-          styleTags.forEach(style => {
-            if (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab')) {
-              // Replace all oklch and oklab values with standard rgb colors
-              style.innerHTML = style.innerHTML.replace(/ok(lch|lab)\([^)]+\)/g, 'rgb(100, 116, 139)');
-            }
-          });
-
-          // Check inline styles as well
-          const clonedPrintArea = clonedDoc.getElementById('report-print-area');
-          if (clonedPrintArea) {
-            const allElements = clonedPrintArea.querySelectorAll('*');
-            allElements.forEach(el => {
-              if (el.style && el.style.cssText && (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab'))) {
-                el.style.cssText = el.style.cssText.replace(/ok(lch|lab)\([^)]+\)/g, 'rgb(100, 116, 139)');
-              }
-            });
-          }
-        }
+        windowWidth: Math.max(printArea.scrollWidth, A4_PX_WIDTH),
+        scrollX: -window.scrollX,
+        scrollY: -window.scrollY,
       });
 
-      // Restore elements styling
-      noPrintElements.forEach(el => {
-        el.style.display = el.dataset.originalDisplay || '';
-      });
-      originalStyles.forEach(styleInfo => {
-        styleInfo.element.style.overflowX = styleInfo.overflowX;
-        styleInfo.element.style.width = styleInfo.width;
-        styleInfo.element.style.maxWidth = styleInfo.maxWidth;
-      });
-      if (printHeader) {
-        printHeader.style.display = 'none';
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Generated canvas is empty');
       }
 
-      // Convert canvas to image
+      printArea.style.width = savedWidth;
+      printArea.style.minWidth = savedMinWidth;
+      printArea.style.maxWidth = savedMaxWidth;
+
+      hiddenElements.forEach(({ el, display }) => {
+        el.style.display = display;
+      });
+      originalScrollStyles.forEach(({ el, overflowX, width, maxWidth }) => {
+        el.style.overflowX = overflowX;
+        el.style.width = width;
+        el.style.maxWidth = maxWidth;
+      });
+      if (printHeader && headerDisplay !== null) {
+        printHeader.style.display = headerDisplay;
+      }
+
       const imgData = canvas.toDataURL('image/png');
-      
-      // jsPDF setup (A4 dimensions: 210mm x 297mm)
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
       const pageHeight = 297;
@@ -571,33 +564,30 @@ const Reports = () => {
       let heightLeft = imgHeight;
       let position = 0;
 
-      // Add image to PDF, spanning multiple pages if necessary
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, '', 'FAST');
       heightLeft -= pageHeight;
 
-      while (heightLeft >= 0) {
+      while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, '', 'FAST');
         heightLeft -= pageHeight;
       }
 
-      // Save PDF
       pdf.save(`Attendance_Report_${selectedClass.replace(/\s+/g, '_')}_${courseName.replace(/\s+/g, '_')}_${reportType}.pdf`);
-      
       toast.update(toastId, {
         render: 'PDF Report downloaded successfully!',
         type: 'success',
         isLoading: false,
-        autoClose: 3000
+        autoClose: 3000,
       });
     } catch (err) {
       console.error('PDF generation error:', err);
       toast.update(toastId, {
-        render: 'Failed to generate PDF. Please try again.',
+        render: `Failed to generate PDF: ${err.message}`,
         type: 'error',
         isLoading: false,
-        autoClose: 3000
+        autoClose: 4000,
       });
     }
   };

@@ -112,18 +112,7 @@ const StudentsList = () => {
     { key: 'name', label: 'Student Name' },
     { key: 'email', label: 'Email Address' },
     { key: 'phone', label: 'Phone', render: (val) => val || 'N/A' },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (val) => (
-        <span className={`px-3 py-1 rounded-lg text-[10px] font-bold tracking-widest uppercase ${val === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' :
-            val === 'INACTIVE' ? 'bg-red-50 text-red-600' :
-              'bg-amber-50 text-amber-600'
-          }`}>
-          {val || 'ACTIVE'}
-        </span>
-      )
-    },
+
     {
       key: 'createdAt',
       label: 'Enrollment Date',
@@ -163,17 +152,17 @@ const StudentsList = () => {
 
   return (
     <div className="">
-      <SectionHeader 
+      <SectionHeader
         title="Student Records"
-        subtitle="View and manage student profiles and academic statuses."
+        subtitle="View and manage student profiles."
         button={!isStudent ? (
-        <button
-          onClick={() => navigate('/dashboard/user-logs/add-user')}
-          className="btn btn-blue"
-        >
-          Enroll Student
-        </button>
-      ) : null}
+          <button
+            onClick={() => navigate('/dashboard/user-logs/add-user')}
+            className="btn btn-blue"
+          >
+            Enroll Student
+          </button>
+        ) : null}
       />
 
       <div className="bg-white rounded-lg border-0 p-1 mt-6 overflow-hidden">
@@ -225,7 +214,7 @@ const StudentsList = () => {
             display: 'flex',
             flexDirection: 'column',
           }} onClick={(e) => e.stopPropagation()}>
-            
+
             {/* Modal Header */}
             <div style={{
               display: 'flex',
@@ -236,21 +225,6 @@ const StudentsList = () => {
               background: 'linear-gradient(to right, #f8fafc, #ffffff)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '20px',
-                  fontWeight: 'bold',
-                  boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.2)',
-                }}>
-                  {selectedStudent.name ? selectedStudent.name.charAt(0).toUpperCase() : 'S'}
-                </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
                     {selectedStudent.name}
@@ -284,7 +258,7 @@ const StudentsList = () => {
 
             {/* Modal Body */}
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
+
               {/* Profile Details Grid */}
               <div style={{
                 display: 'grid',
@@ -316,20 +290,7 @@ const StudentsList = () => {
                     marginTop: '2px',
                   }}>{selectedStudent.className || 'N/A'}</span>
                 </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.05em' }}>Account Status</span>
-                  <span style={{
-                    display: 'inline-block',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    marginTop: '2px',
-                    backgroundColor: selectedStudent.status === 'ACTIVE' ? '#d1fae5' : '#fee2e2',
-                    color: selectedStudent.status === 'ACTIVE' ? '#065f46' : '#991b1b',
-                  }}>{selectedStudent.status || 'ACTIVE'}</span>
-                </div>
+
               </div>
 
               {/* Attendance Summary List */}
@@ -337,7 +298,7 @@ const StudentsList = () => {
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '700', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
                   Course Attendance Performance
                 </h4>
-                
+
                 {detailLoading ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '8px' }}>
                     <Icons.RefreshCcw className="animate-spin" style={{ color: '#0ea5e9' }} size={24} />

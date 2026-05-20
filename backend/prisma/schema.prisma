@@ -13,12 +13,6 @@ enum Role {
   STUDENT
 }
 
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  PENDING
-}
-
 enum AttendanceStatus {
   PRESENT
   ABSENT
@@ -32,7 +26,6 @@ model User {
   name      String
   phone     String?
   role      Role       @default(STUDENT)
-  status    UserStatus @default(ACTIVE)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -109,6 +102,7 @@ model Attendance {
   studentId Int
   courseId  Int
   date      DateTime         @default(now())
+  markedAt  DateTime         @default(now())
   status    AttendanceStatus @default(PRESENT)
   location  String?
   notes     String?
