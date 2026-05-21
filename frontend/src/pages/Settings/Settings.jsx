@@ -1,47 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Copy, 
-  Check, 
-  Terminal, 
+import React, { useEffect, useState } from 'react';
+import {
+  Copy,
+  Check,
+  Terminal,
   HelpCircle,
   Info,
-  Lock,
-  ExternalLink,
   Code,
-  School
+  School,
+  Pencil,
+  Link,
 } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
-import api from '../../api';
 import { toast } from 'react-toastify';
+import api from '../../api';
 
 const Settings = () => {
-  const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [instituteId, setInstituteId] = useState('');
-  const [instituteName, setInstituteName] = useState('Your Institute');
+  const [instituteName, setInstituteName] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState('');
+  const displayInstituteId = instituteId || 'your-institute-id-here';
 
   const APP_URL = window.location.origin + '/#';
 
-  useEffect(() => {
-    fetchLmsConfig();
-  }, []);
+  const handleSaveName = async (val) => {
+    const trimmed = val.trim();
+    if (!trimmed) {
+      setEditingName(false);
+      return;
+    }
 
-  const fetchLmsConfig = async () => {
-    setLoading(true);
     try {
-      const response = await api.getLmsConfig();
+      const response = await api.updateLmsConfig({ instituteName: trimmed });
       if (response.success && response.config) {
-        setInstituteId(response.config.instituteId);
-        setInstituteName(response.config.instituteName || 'Your Institute');
+        setInstituteName(response.config.instituteName);
+        toast.success('Institute name updated successfully');
+      } else {
+        toast.error(response.message || 'Unable to save institute name.');
       }
     } catch (error) {
-      console.error('[fetchLmsConfig] Error loading LMS config:', error);
-      toast.error(error.message || 'Failed to load LMS settings');
-    } finally {
-      setLoading(false);
+      toast.error(error.message || 'Unable to save institute name.');
     }
+
+    setEditingName(false);
   };
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      setConfigLoading(true);
+      try {
+        const response = await api.getLmsConfig();
+        if (response.success && response.config) {
+          setInstituteId(response.config.instituteId);
+          setInstituteName(response.config.instituteName || 'My Institute');
+        } else {
+          setConfigError(response.message || 'Unable to load institute configuration.');
+          toast.error(response.message || 'Unable to load institute configuration.');
+        }
+      } catch (error) {
+        setConfigError(error.message || 'Unable to load institute configuration.');
+        toast.error(error.message || 'Unable to load institute configuration.');
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, []);
 
   const copyToClipboard = (text, setCopied) => {
     navigator.clipboard.writeText(text);
@@ -50,23 +79,16 @@ const Settings = () => {
     toast.success('Copied to clipboard!');
   };
 
-  // Generate example iframe snippet using the real loaded instituteId
+  // Generate iframe snippet using the static instituteId
   const iframeSnippet = `<iframe 
-  src="${APP_URL}/embed/attendance?instituteId=${instituteId || 'YOUR_INSTITUTE_ID'}&email=USER_EMAIL_HERE&role=TEACHER"
+  src="${APP_URL}/embed/attendance?instituteId=${displayInstituteId}&email=USER_EMAIL_HERE&role=TEACHER"
   width="100%" 
   height="720px" 
   style="border: none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);"
   allow="camera; microphone"
 ></iframe>`;
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-[#07384d] animate-spin" />
-        <p className="text-slate-500 font-medium animate-pulse">Loading Integration Configurations...</p>
-      </div>
-    );
-  }
+  const embedUrl = `${APP_URL}/embed/attendance?instituteId=${displayInstituteId}&email=USER_EMAIL_HERE&role=TEACHER`;
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -75,27 +97,57 @@ const Settings = () => {
         subtitle="Embed your AMS Attendance Portal directly into Moodle, Canvas, Blackboard, or any custom University platform using simple iframe snippets."
       />
 
+      {configLoading && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 shadow-sm">
+          Loading institute configuration...
+        </div>
+      )}
+      {configError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+          {configError}
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Columns: Parameters list and simple instructions */}
         <div className="lg:col-span-2 space-y-8">
           
-          {/* Institute ID Details */}
+          {/* Institute Profile – Editable */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 bg-slate-50/50 p-5 flex items-center gap-2">
               <School className="text-[#07384d]" size={20} />
               <h2 className="font-bold text-slate-800 text-base">Institute Profile</h2>
+              <span className="ml-auto text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">Static Config</span>
             </div>
             
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* School Name – editable */}
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">School Name</label>
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-3.5 text-sm font-semibold text-slate-700">
-                    {instituteName}
-                  </div>
+                  {editingName ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        defaultValue={instituteName}
+                        onBlur={(e) => handleSaveName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(e.target.value); }}
+                        className="w-full border border-blue-300 rounded-lg py-2.5 px-3.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => setEditingName(true)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-3.5 text-sm font-semibold text-slate-700 flex items-center justify-between cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all group"
+                    >
+                      <span>{instituteName}</span>
+                      <Pencil size={13} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                    </div>
+                  )}
                 </div>
 
+                {/* Institute ID – editable */}
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Institute ID</label>
                   <div className="flex gap-2">
@@ -103,11 +155,11 @@ const Settings = () => {
                       type="text" 
                       readOnly 
                       value={instituteId} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-sm text-slate-600 font-mono focus:outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-sm text-slate-600 font-mono focus:outline-none transition-all"
                     />
                     <button 
                       onClick={() => copyToClipboard(instituteId, setCopiedId)}
-                      className="py-2 px-4 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all flex items-center gap-1.5 font-semibold text-xs text-slate-700 bg-white"
+                      className="py-2 px-4 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all flex items-center gap-1.5 font-semibold text-xs text-slate-700 bg-white shrink-0"
                       title="Copy Institute ID"
                     >
                       {copiedId ? <Check size={14} className="text-green-600 animate-scaleIn" /> : <Copy size={14} />}
@@ -117,8 +169,36 @@ const Settings = () => {
                 </div>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Your unique database identifier is used to separate your courses, student logs, and attendance rosters from other institutes using this cloud platform.
+                The institute values are loaded from backend configuration and stored in the database. Use this ID in your LMS iframe URL to verify users across any LMS instance.
               </p>
+            </div>
+          </div>
+
+          {/* Direct Embed URL */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="border-b border-slate-100 bg-slate-50/50 p-5 flex items-center gap-2">
+              <Link className="text-[#07384d]" size={20} />
+              <h2 className="font-bold text-slate-800 text-base">Direct Embed URL</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Use this URL directly in your LMS embed configuration, or paste it into an iframe <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">src</code> attribute. Replace <code className="bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-mono text-[10px] text-amber-700 font-bold">USER_EMAIL_HERE</code> with the logged-in user's email dynamically.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={embedUrl}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-3.5 text-xs font-mono text-slate-600 focus:outline-none"
+                />
+                <button
+                  onClick={() => copyToClipboard(embedUrl, setCopiedUrl)}
+                  className="py-2 px-4 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all flex items-center gap-1.5 font-semibold text-xs text-slate-700 bg-white shrink-0"
+                >
+                  {copiedUrl ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                  <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -148,7 +228,7 @@ const Settings = () => {
                       <td className="p-4 font-mono font-bold text-[#07384d]">instituteId</td>
                       <td className="p-4 font-semibold text-green-600 bg-green-50/50 text-[10px] uppercase text-center w-24">Required</td>
                       <td className="p-4 leading-relaxed">
-                        Must match your unique school ID: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[10px] text-slate-700 font-bold">{instituteId || 'YOUR_ID'}</code>
+                        Must match your unique school ID: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[10px] text-slate-700 font-bold">{instituteId}</code>
                       </td>
                     </tr>
                     <tr className="hover:bg-slate-50/50 transition-colors">
@@ -208,9 +288,9 @@ const Settings = () => {
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-start gap-2.5">
                 <Info className="text-blue-600 shrink-0 mt-0.5" size={16} />
                 <div className="text-xs text-blue-800 space-y-1">
-                  <p className="font-bold">Project Simplicity Mode</p>
+                  <p className="font-bold">Backend-backed LMS Embed Settings</p>
                   <p className="leading-relaxed">
-                    Domain restrictions, IP white-lists, and cryptographic signatures have been bypassed so you can seamlessly test embeds on local server instances, custom ports, and different host names.
+                    Your institution ID and name are now loaded from the server so the iframe can work across multiple LMS systems. Only the admin owner can manage this configuration.
                   </p>
                 </div>
               </div>
@@ -248,3 +328,4 @@ const Settings = () => {
 };
 
 export default Settings;
+

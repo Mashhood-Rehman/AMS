@@ -9,6 +9,7 @@ import courseRoutes from './routes/courseRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import instituteRoutes from './routes/instituteRoutes.js';
 import lmsRoutes from './routes/lmsRoutes.js';
+import teacherAttendanceRoutes from './routes/teacherAttendanceRoutes.js';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/institutes', instituteRoutes);
 app.use('/api/lms', lmsRoutes);
+app.use('/api/teacher-attendance', teacherAttendanceRoutes);
 
 
 app.listen(PORT, async () => {

@@ -72,7 +72,7 @@ const Sidebar = ({ isSidebarOpen }) => {
               {hasSubTabs ? (
                 <button
                   onClick={() => toggleMenu(item.title)}
-                  className={`w-full ml-1 flex items-center rounded-lg transition-all duration-200 group cursor-pointer
+                  className={`w-full flex items-center rounded-lg ml-4 transition-all duration-200 group cursor-pointer
                     ${isSidebarOpen ? 'gap-4 py-3 justify-between' : 'gap-0 py-3 justify-center'}
                     ${isActive
                       ? 'bg-brand-active text-white shadow-lg shadow-black/20'

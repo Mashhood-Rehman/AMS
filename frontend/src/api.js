@@ -2,7 +2,6 @@ import axios from 'axios';
 
 let BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Dynamically resolve backend IP to allow mobile devices to connect when running locally
 if (typeof window !== 'undefined') {
   const currentHostname = window.location.hostname;
   const isLocal = currentHostname === 'localhost' || currentHostname === '127.0.0.1';
@@ -42,7 +41,6 @@ apiInstance.interceptors.request.use(
 );
 
 export const api = {
-  // Auth endpoints
   login: async (credentials) => {
     try {
       const response = await apiInstance.post('/auth/login', credentials);
@@ -52,7 +50,6 @@ export const api = {
     }
   },
 
-  // Future endpoints can be added here
   signup: async (userData) => {
     try {
       const response = await apiInstance.post('/auth/signup', userData);
@@ -161,6 +158,42 @@ export const api = {
     }
   },
 
+  markTeacherAttendance: async (data = {}) => {
+    try {
+      const response = await apiInstance.post('/teacher-attendance/mark', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  adminOverrideTeacherAttendance: async (data = {}) => {
+    try {
+      const response = await apiInstance.post('/teacher-attendance/override', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getTodayTeacherAttendance: async () => {
+    try {
+      const response = await apiInstance.get('/teacher-attendance/today');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getAllTeachersToday: async () => {
+    try {
+      const response = await apiInstance.get('/teacher-attendance/all-today');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
   getCourses: async (params = {}) => {
     try {
       const response = await apiInstance.get('/courses', { params });
@@ -254,6 +287,52 @@ export const api = {
   verifyLmsEmbed: async (params) => {
     try {
       const response = await apiInstance.get('/lms/verify-embed', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  // Teacher Attendance endpoints
+  markTeacherAttendance: async (data) => {
+    try {
+      const response = await apiInstance.post('/teacher-attendance/mark', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  adminOverrideTeacherAttendance: async (data) => {
+    try {
+      const response = await apiInstance.post('/teacher-attendance/override', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getTodayTeacherAttendance: async () => {
+    try {
+      const response = await apiInstance.get('/teacher-attendance/today');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getAllTeachersToday: async () => {
+    try {
+      const response = await apiInstance.get('/teacher-attendance/all-today');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getTeacherAttendance: async (params = {}) => {
+    try {
+      const response = await apiInstance.get('/teacher-attendance', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Network error or server unavailable' };

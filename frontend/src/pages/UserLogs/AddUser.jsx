@@ -223,7 +223,6 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
         { label: 'Student', value: 'STUDENT' }
       ]
       : [
-        { label: 'Teacher', value: 'TEACHER' },
         { label: 'Student', value: 'STUDENT' }
       ]
   );

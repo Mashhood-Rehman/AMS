@@ -61,7 +61,8 @@ const StudentsList = () => {
           fetchStudents();
         }
       } catch (error) {
-        alert('Failed to delete student');
+        const message = error.response?.data?.message || 'Failed to delete student';
+        alert(message);
       }
     }
   };

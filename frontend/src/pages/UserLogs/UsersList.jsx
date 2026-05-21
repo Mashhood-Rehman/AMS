@@ -40,6 +40,7 @@ const UsersList = () => {
           fetchUsers();
         }
       } catch (error) {
+        console.log(error)
         alert('Failed to delete user');
       }
     }

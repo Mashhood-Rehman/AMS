@@ -118,12 +118,6 @@ export const markAttendance = async (req, res) => {
   }
 };
 
-// ─── Get All Attendance (with filters) ───────────────────────────────────────
-
-/**
- * GET /api/attendance
- * Optional query params: studentId, courseId, status, date, startDate, endDate, page, limit
- */
 export const getAllAttendance = async (req, res) => {
   try {
     const {
@@ -182,11 +176,6 @@ export const getAllAttendance = async (req, res) => {
   }
 };
 
-// ─── Get Single Attendance Record ─────────────────────────────────────────────
-
-/**
- * GET /api/attendance/:id
- */
 export const getAttendanceById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -208,12 +197,6 @@ export const getAttendanceById = async (req, res) => {
   }
 };
 
-// ─── Update Attendance Record ─────────────────────────────────────────────────
-
-/**
- * PUT /api/attendance/:id
- * Body: { status?, location?, notes? }
- */
 export const updateAttendance = async (req, res) => {
   try {
     const { id } = req.params;
@@ -276,11 +259,6 @@ export const updateAttendance = async (req, res) => {
   }
 };
 
-// ─── Delete Attendance Record ─────────────────────────────────────────────────
-
-/**
- * DELETE /api/attendance/:id
- */
 export const deleteAttendance = async (req, res) => {
   try {
     const { id } = req.params;
@@ -296,18 +274,14 @@ export const deleteAttendance = async (req, res) => {
   }
 };
 
-// ─── Attendance by Course ──────────────────────────────────────────────────────
-
-/**
- * GET /api/attendance/course/:courseId
- * Optional query: date, startDate, endDate
- * Returns all attendance entries for a specific course grouped by date.
- */
 export const getAttendanceByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { date, startDate, endDate } = req.query;
-    console.log(`[getAttendanceByCourse] courseId=${courseId} date=${date} startDate=${startDate} endDate=${endDate}`);
+    const providedQuery = Object.fromEntries(
+      Object.entries({ date, startDate, endDate }).filter(([, v]) => v !== undefined)
+    );
+    console.log(`[getAttendanceByCourse] courseId=${courseId} query=${JSON.stringify(providedQuery)}`);
 
     const course = await prisma.course.findUnique({ where: { id: parseInt(courseId) } });
     if (!course) {
@@ -337,13 +311,6 @@ export const getAttendanceByCourse = async (req, res) => {
   }
 };
 
-// ─── Attendance by Student ─────────────────────────────────────────────────────
-
-/**
- * GET /api/attendance/student/:studentId
- * Optional query: courseId, startDate, endDate
- * Returns all attendance entries for a specific student.
- */
 export const getAttendanceByStudent = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -376,13 +343,6 @@ export const getAttendanceByStudent = async (req, res) => {
   }
 };
 
-// ─── Attendance Summary ────────────────────────────────────────────────────────
-
-/**
- * GET /api/attendance/summary
- * Optional query: courseId, studentId, startDate, endDate
- * Returns per-student-per-course counts for PRESENT / ABSENT / LATE and a percentage.
- */
 export const getAttendanceSummary = async (req, res) => {
   try {
     const { courseId, studentId, startDate, endDate } = req.query;
@@ -455,13 +415,6 @@ export const getAttendanceSummary = async (req, res) => {
   }
 };
 
-// ─── Bulk Mark Attendance ──────────────────────────────────────────────────────
-
-/**
- * POST /api/attendance/bulk
- * Body: { courseId, date?, records: [{ studentId, status, location?, notes? }] }
- * Marks attendance for multiple students in one course in a single request.
- */
 export const bulkMarkAttendance = async (req, res) => {
   try {
     const { courseId, date, records } = req.body;
@@ -634,25 +587,21 @@ export const verifyQRToken = (courseId, dateStr, token, studentId = null) => {
   return token === hashCurrent || token === hashPrev;
 };
 
-/**
- * GET /api/attendance/qr-token/:courseId
- * Generates the secure, time-sensitive QR token for the teacher dashboard.
- */
 export const getQRToken = async (req, res) => {
   try {
     const { courseId } = req.params;
     const requestingUserId = req.userId;
     console.log(`[QR ATTENDANCE VERIFICATION] Generating QR Token request: courseId=${courseId}, req.userId=${requestingUserId}`);
 
-    // Check if requesting user is a STUDENT to bind their ID
     const user = await prisma.user.findUnique({ where: { id: parseInt(requestingUserId) } });
     const isStudent = user?.role === 'STUDENT';
-    const studentId = isStudent ? parseInt(requestingUserId) : null;
+    const isTeacher = user?.role === 'TEACHER';
+    const boundId = (isStudent || isTeacher) ? parseInt(requestingUserId) : null;
 
     const dateStr = new Date().toISOString().split('T')[0];
-    const token = generateQRToken(courseId, dateStr, studentId);
+    const token = generateQRToken(courseId, dateStr, boundId);
 
-    console.log(`[QR ATTENDANCE VERIFICATION] Generated token bound to studentId=${studentId}`);
+    console.log(`[QR ATTENDANCE VERIFICATION] Generated token bound to userId=${boundId}`);
     return res.status(200).json({
       success: true,
       token,
@@ -665,17 +614,12 @@ export const getQRToken = async (req, res) => {
   }
 };
 
-/**
- * POST /api/attendance/mark-qr
- * Body: { courseId, token, desktopUserId }
- * Marks student attendance using the scanned QR token.
- */
 export const markAttendanceQR = async (req, res) => {
   try {
     const { courseId, token, desktopUserId } = req.body;
-    const studentId = req.userId; // The student logged in on the mobile phone scanning the QR code
+    const mobileUserId = req.userId;
 
-    console.log(`[QR ATTENDANCE VERIFICATION] Attempting QR Check-in: courseId=${courseId}, mobileStudentId=${studentId}, desktopUserId=${desktopUserId}`);
+    console.log(`[QR ATTENDANCE VERIFICATION] Attempting QR Check-in: courseId=${courseId}, mobileUserId=${mobileUserId}, desktopUserId=${desktopUserId}`);
 
     if (!courseId || !token) {
       console.warn(`[QR ATTENDANCE VERIFICATION] Missing parameters: courseId=${courseId}, token=${token}`);
@@ -686,13 +630,10 @@ export const markAttendanceQR = async (req, res) => {
     }
 
     const dateStr = new Date().toISOString().split('T')[0];
-
-    // If desktopUserId is provided, it means this was scanned from a student's desktop session.
-    // Verify the dynamic token hash matching the student's ID.
-    const expectedStudentId = desktopUserId ? parseInt(desktopUserId) : null;
-    const isTokenValid = verifyQRToken(courseId, dateStr, token, expectedStudentId);
+    const expectedUserId = desktopUserId ? parseInt(desktopUserId) : parseInt(mobileUserId);
+    const isTokenValid = verifyQRToken(courseId, dateStr, token, expectedUserId);
     if (!isTokenValid) {
-      console.warn(`[QR ATTENDANCE VERIFICATION] Invalid or expired token: ${token} for expectedStudentId=${expectedStudentId}`);
+      console.warn(`[QR ATTENDANCE VERIFICATION] Invalid or expired token: ${token} for expectedUserId=${expectedUserId}`);
       return res.status(400).json({
         success: false,
         message: 'The scanned QR code is invalid or has expired. Please ask the instructor or refresh your desktop page.',
@@ -700,18 +641,77 @@ export const markAttendanceQR = async (req, res) => {
     }
 
     // Crucial validation: Ensure the mobile user is indeed the same user as the logged-in desktop session user
-    if (desktopUserId && parseInt(desktopUserId) !== parseInt(studentId)) {
-      console.warn(`[QR ATTENDANCE VERIFICATION] MISMATCH DETECTED: Mobile user (ID=${studentId}) does not match desktop user (ID=${desktopUserId})`);
+    if (desktopUserId && parseInt(desktopUserId) !== parseInt(mobileUserId)) {
+      console.warn(`[QR ATTENDANCE VERIFICATION] MISMATCH DETECTED: Mobile user (ID=${mobileUserId}) does not match desktop user (ID=${desktopUserId})`);
       return res.status(403).json({
         success: false,
-        message: 'Mismatch Error: The logged-in student on this phone does not match the active desktop session!',
+        message: 'Mismatch Error: The logged-in user on this phone does not match the active desktop session!',
+      });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: parseInt(mobileUserId) } });
+    if (!user) {
+      console.warn(`[QR ATTENDANCE VERIFICATION] User account not found: ID=${mobileUserId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'User account could not be found.',
+      });
+    }
+
+    if (user.role === 'TEACHER') {
+      const today = new Date();
+      const classTime = new Date(today);
+      classTime.setHours(8, 0, 0, 0);
+      const lateDeadline = new Date(classTime.getTime() + 15 * 60 * 1000);
+
+      if (new Date() > lateDeadline) {
+        return res.status(403).json({
+          success: false,
+          message: 'The attendance window has closed for teacher QR check-in. Please contact an administrator.',
+        });
+      }
+
+      const status = new Date() < classTime ? 'PRESENT' : 'LATE';
+      const dateKey = toDateKey(dateStr);
+
+      const attendance = await prisma.teacherAttendance.upsert({
+        where: { teacherId_date: { teacherId: parseInt(mobileUserId), date: dateKey } },
+        update: {
+          status,
+          markedByRole: 'TEACHER',
+          notes: 'Marked automatically via QR Code scan',
+          location: req.body.location ?? null,
+          latitude: req.body.latitude ?? null,
+          longitude: req.body.longitude ?? null,
+          markedAt: new Date(),
+        },
+        create: {
+          teacherId: parseInt(mobileUserId),
+          date: dateKey,
+          status,
+          markedByRole: 'TEACHER',
+          notes: 'Marked automatically via QR Code scan',
+          location: req.body.location ?? null,
+          latitude: req.body.latitude ?? null,
+          longitude: req.body.longitude ?? null,
+          markedAt: new Date(),
+        },
+        include: {
+          teacher: { select: { id: true, name: true, email: true } },
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Teacher attendance marked as ${status}.`,
+        attendance,
       });
     }
 
     // Verify student exists
-    const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) } });
+    const student = await prisma.user.findUnique({ where: { id: parseInt(mobileUserId) } });
     if (!student) {
-      console.warn(`[QR ATTENDANCE VERIFICATION] Student account not found: ID=${studentId}`);
+      console.warn(`[QR ATTENDANCE VERIFICATION] Student account not found: ID=${mobileUserId}`);
       return res.status(404).json({
         success: false,
         message: 'Student account could not be found.',
@@ -729,7 +729,7 @@ export const markAttendanceQR = async (req, res) => {
     const enrollment = await prisma.enrollment.findUnique({
       where: {
         studentId_courseId: {
-          studentId: parseInt(studentId),
+          studentId: parseInt(mobileUserId),
           courseId: parseInt(courseId),
         },
       },
@@ -738,7 +738,7 @@ export const markAttendanceQR = async (req, res) => {
     const isSameClass = !!(student.className && course.className && student.className === course.className);
 
     if (!enrollment && !isSameClass) {
-      console.warn(`[QR ATTENDANCE VERIFICATION] Student ID=${studentId} is not enrolled or shares the same class as course ID=${courseId}`);
+      console.warn(`[QR ATTENDANCE VERIFICATION] Student ID=${mobileUserId} is not enrolled or shares the same class as course ID=${courseId}`);
       return res.status(403).json({
         success: false,
         message: 'You are not enrolled in this course.',
@@ -751,7 +751,7 @@ export const markAttendanceQR = async (req, res) => {
     const existing = await prisma.attendance.findUnique({
       where: {
         studentId_courseId_date: {
-          studentId: parseInt(studentId),
+          studentId: parseInt(mobileUserId),
           courseId: parseInt(courseId),
           date: dateKey,
         },
@@ -769,7 +769,7 @@ export const markAttendanceQR = async (req, res) => {
     const attendance = await prisma.attendance.upsert({
       where: {
         studentId_courseId_date: {
-          studentId: parseInt(studentId),
+          studentId: parseInt(mobileUserId),
           courseId: parseInt(courseId),
           date: dateKey,
         },
@@ -782,7 +782,7 @@ export const markAttendanceQR = async (req, res) => {
         markedAt: new Date(),
       },
       create: {
-        studentId: parseInt(studentId),
+        studentId: parseInt(mobileUserId),
         courseId: parseInt(courseId),
         date: dateKey,
         markedAt: new Date(),
@@ -844,10 +844,6 @@ const countExpectedClasses = (courseDays, startStr, endStr) => {
   return count;
 };
 
-/**
- * POST /api/attendance/send-low-alerts
- * Body: { courseId, className, month, year, bypassDateCheck? }
- */
 export const sendLowAttendanceAlerts = async (req, res) => {
   try {
     const { courseId, className, month, year, bypassDateCheck } = req.body;
@@ -1002,10 +998,6 @@ export const sendLowAttendanceAlerts = async (req, res) => {
   }
 };
 
-/**
- * GET /api/attendance/student-summary/:studentId
- * Returns student profile details and course-by-course attendance summary
- */
 export const getStudentAttendanceSummary = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -1094,10 +1086,6 @@ export const getStudentAttendanceSummary = async (req, res) => {
   }
 };
 
-/**
- * POST /api/attendance/send-manual-alert
- * Dispatches a manual attendance report email to a student
- */
 export const sendManualAttendanceAlert = async (req, res) => {
   try {
     const { studentId, customMessage } = req.body;

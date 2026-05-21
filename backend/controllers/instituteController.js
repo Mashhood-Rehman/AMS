@@ -76,9 +76,6 @@ export const getInstituteById = async (req, res) => {
       }
     });
 
-    if (!institute) {
-      return res.status(404).json({ success: false, message: 'Institute not found' });
-    }
 
     res.json({ success: true, institute });
   } catch (error) {

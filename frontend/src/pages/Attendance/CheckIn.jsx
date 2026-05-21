@@ -39,9 +39,9 @@ const CheckIn = () => {
     }
 
     // Authenticated - verify role
-    if (loggedInUser.role !== 'STUDENT') {
+    if (loggedInUser.role !== 'STUDENT' && loggedInUser.role !== 'TEACHER') {
       setStatus('error');
-      setMessage('Only students can record attendance using QR check-in.');
+      setMessage('Only students and teachers can record attendance using QR check-in.');
       return;
     }
 
@@ -127,8 +127,8 @@ const CheckIn = () => {
                   <span className="text-xs font-bold text-slate-700">{details.course?.code}</span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200/50 pb-2">
-                  <span className="text-xs font-semibold text-slate-400">STUDENT</span>
-                  <span className="text-xs font-bold text-slate-700">{details.student?.name}</span>
+                  <span className="text-xs font-semibold text-slate-400">{details.student ? 'STUDENT' : 'TEACHER'}</span>
+                  <span className="text-xs font-bold text-slate-700">{details.student?.name || details.teacher?.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs font-semibold text-slate-400">DATE & TIME</span>

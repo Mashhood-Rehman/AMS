@@ -6,10 +6,12 @@ import { getCurrentLocation } from '../../utils/geolocation';
 import { getLocationNameFromCoordinates } from '../../utils/reverseGeocode';
 
 const STATUS_OPTIONS = ['PRESENT', 'ABSENT'];
+const TEACHER_STATUS_OPTIONS = ['PRESENT', 'ABSENT', 'LATE'];
 
 const statusStyle = {
   PRESENT: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   ABSENT: 'bg-red-50 text-red-600 border-red-200',
+  LATE: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
 const statusIcon = {
@@ -87,6 +89,15 @@ const MarkAttendance = () => {
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrToken, setQrToken] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState(null);
+  const [teacherAttendance, setTeacherAttendance] = useState(null);
+  const [teacherWindow, setTeacherWindow] = useState(null);
+  const [allTeachersToday, setAllTeachersToday] = useState([]);
+  const [teacherLoading, setTeacherLoading] = useState(false);
+  const [teacherMarkLoading, setTeacherMarkLoading] = useState(false);
+  const [overrideStatusMap, setOverrideStatusMap] = useState({});
+  const [overrideLoadingMap, setOverrideLoadingMap] = useState({});
+  const [mainTab, setMainTab] = useState('mark');
 
   // --- Location Fallback & Nominatim Autocomplete State ---
   const [resolvedLocation, setResolvedLocation] = useState({
@@ -118,7 +129,6 @@ const MarkAttendance = () => {
     return !isGraceOver;
   };
 
-  // Automatically detect location
   const detectLocation = async () => {
     setResolvedLocation(prev => ({ ...prev, loading: true, error: null, source: 'PENDING' }));
     try {
@@ -129,9 +139,9 @@ const MarkAttendance = () => {
         if (loc.city) parts.push(loc.city);
         if (loc.region) parts.push(loc.region);
         if (loc.country) parts.push(loc.country);
-        name = parts.join(', ') || 'Unknown Location (IP)';
+        name = parts.join(', ') || 'Lahore, Pakistan';
         if (loc.isDefaultFallback) {
-          name = 'Lahore, Punjab, Pakistan1';
+          name = 'Faisal Auditorium, Canal Bank Road';
         }
       } else {
         name = await getLocationNameFromCoordinates(loc.latitude, loc.longitude);
@@ -143,14 +153,14 @@ const MarkAttendance = () => {
         locationName: name,
         source: loc.isDefaultFallback ? 'ERROR' : (loc.isIPBased ? 'IP' : 'GPS'),
         loading: false,
-        error: loc.isDefaultFallback ? 'Browser GPS unavailable. Approximate location used.' : null,
+        error: loc.isDefaultFallback ? '' : null,
       });
     } catch (err) {
       console.error('[ATTENDANCE] Geolocation detection failed:', err);
       setResolvedLocation({
         latitude: null,
         longitude: null,
-        locationName: 'Lahore, Punjab, Pakistan2',
+        locationName: 'Faisal Auditorium, Canal Bank Road',
         source: 'ERROR',
         loading: false,
         error: err.message || 'Failed to detect location. Fallback active.',
@@ -163,69 +173,100 @@ const MarkAttendance = () => {
     detectLocation();
   }, []);
 
+  // Fetch QR token (component scope) so buttons can trigger it immediately
+  const fetchQRToken = async (overrideCourseId) => {
+    const courseIdToUse = overrideCourseId || selectedCourse || (mainTab === 'teacher' ? '0' : '');
+    if (!courseIdToUse) return;
+    try {
+      setQrLoading(true);
+      setQrError(null);
+      const res = await api.getQRToken(courseIdToUse);
+      if (res && res.success && res.token) {
+        setQrToken(res.token);
+      } else {
+        console.error('Failed to load QR token response:', res);
+        setQrToken('');
+        setQrError(res?.message || 'Failed to obtain QR token');
+      }
+    } catch (err) {
+      console.error('Failed to load QR token:', err);
+      setQrToken('');
+      setQrError(err?.message || 'Network error while fetching QR token');
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
 
   useEffect(() => {
-    if (!showQRModal || !selectedCourse) return;
+    if (!showQRModal) return;
+    if (mainTab !== 'teacher' && !selectedCourse) return;
 
-    const fetchToken = async () => {
-      try {
-        setQrLoading(true);
-        const res = await api.getQRToken(selectedCourse);
-        if (res.success) {
-          setQrToken(res.token);
-        }
-      } catch (err) {
-        console.error("Failed to load QR token:", err);
-      } finally {
-        setQrLoading(false);
-      }
-    };
+    // initial fetch and interval refresher
+    fetchQRToken();
 
-    fetchToken();
+    const tokenInterval = setInterval(() => fetchQRToken(), 60000);
 
-    const tokenInterval = setInterval(fetchToken, 60000);
+    let reloadInterval;
 
-    const reloadStudents = async () => {
-      try {
-        const [usersResponse, attendanceResponse] = await Promise.all([
-          api.getUsers({ role: 'STUDENT', courseId: selectedCourse }),
-          api.getAttendanceByCourse(selectedCourse, { date }),
-        ]);
-        const studentList = usersResponse.users || [];
-        const attendanceList = attendanceResponse.attendance || [];
-        const courseInfo = courses.find(c => String(c.id) === String(selectedCourse));
-        const attendanceMap = new Map(attendanceList.map((record) => [record.studentId, record]));
-
-        const mergedRecords = studentList.map((student) => {
-          const existing = attendanceMap.get(student.id);
-          let defaultStatus = 'PENDING';
-          if (existing) {
-            defaultStatus = existing.status;
-          } else if (courseInfo?.time && isGracePeriodOver(courseInfo.time, date)) {
-            defaultStatus = 'ABSENT';
+    if (mainTab === 'teacher') {
+      const reloadTeacherAttendance = async () => {
+        try {
+          const res = await api.getTodayTeacherAttendance();
+          if (res.success) {
+            setTeacherAttendance(res.attendance);
+            setTeacherWindow(res.window || null);
           }
-          return {
-            studentId: student.id,
-            name: student.name,
-            email: student.email,
-            status: defaultStatus,
-            alreadySaved: !!existing,
-            markedByRole: existing ? existing.markedByRole : null,
-          };
-        });
-        setRecords(mergedRecords);
-      } catch (err) {
-        console.error("Live reload failed:", err);
-      }
-    };
+        } catch (err) {
+          console.error('[TEACHER ATTENDANCE] Silent reload failed:', err);
+        }
+      };
+      reloadInterval = setInterval(reloadTeacherAttendance, 4000);
+    } else {
+      const reloadStudents = async () => {
+        try {
+          const [usersResponse, attendanceResponse] = await Promise.all([
+            api.getUsers({ role: 'STUDENT', courseId: selectedCourse }),
+            api.getAttendanceByCourse(selectedCourse, { date }),
+          ]);
+          let studentList = usersResponse.users || [];
+          if (loggedInUser.role === 'STUDENT') {
+            studentList = studentList.filter(s => s.id === loggedInUser.id);
+          }
+          const attendanceList = attendanceResponse.attendance || [];
+          const courseInfo = courses.find(c => String(c.id) === String(selectedCourse));
+          const attendanceMap = new Map(attendanceList.map((record) => [record.studentId, record]));
 
-    const reloadInterval = setInterval(reloadStudents, 4000);
+          const mergedRecords = studentList.map((student) => {
+            const existing = attendanceMap.get(student.id);
+            let defaultStatus = 'PENDING';
+            if (existing) {
+              defaultStatus = existing.status;
+            } else if (courseInfo?.time && isGracePeriodOver(courseInfo.time, date)) {
+              defaultStatus = 'ABSENT';
+            }
+            return {
+              studentId: student.id,
+              name: student.name,
+              email: student.email,
+              status: defaultStatus,
+              alreadySaved: !!existing,
+              markedByRole: existing ? existing.markedByRole : null,
+            };
+          });
+          setRecords(mergedRecords);
+        } catch (err) {
+          console.error("Live reload failed:", err);
+        }
+      };
+      reloadInterval = setInterval(reloadStudents, 4000);
+    }
 
     return () => {
       clearInterval(tokenInterval);
       clearInterval(reloadInterval);
     };
-  }, [showQRModal, selectedCourse, date, courses]);
+  }, [showQRModal, selectedCourse, date, courses, mainTab]);
 
 
   useEffect(() => {
@@ -303,6 +344,14 @@ const MarkAttendance = () => {
     loadStudentsAndAttendance();
   }, [selectedCourse, date, courses]);
 
+  useEffect(() => {
+    if (userRole === 'TEACHER') {
+      fetchTeacherAttendance();
+    } else if (userRole === 'ADMIN') {
+      fetchAllTeachersToday();
+    }
+  }, [userRole, date]);
+
   // Real-time ticker to auto-mark ABSENT for students who are currently on the page
   useEffect(() => {
     if (!isStudentRole || !courseDetails?.time || !date || records.length === 0) return;
@@ -346,6 +395,103 @@ const MarkAttendance = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
+  const fetchTeacherAttendance = async () => {
+    setTeacherLoading(true);
+    try {
+      const res = await api.getTodayTeacherAttendance();
+      if (res.success) {
+        setTeacherAttendance(res.attendance);
+        setTeacherWindow(res.window || null);
+      }
+    } catch (err) {
+      console.error('[TEACHER ATTENDANCE] Failed to load today attendance:', err);
+      showToast('error', err.message || 'Failed to load teacher attendance.');
+    } finally {
+      setTeacherLoading(false);
+    }
+  };
+
+  const fetchAllTeachersToday = async () => {
+    setTeacherLoading(true);
+    try {
+      const res = await api.getAllTeachersToday();
+      if (res.success) {
+        setAllTeachersToday(res.teachers || []);
+        setTeacherWindow(res.window || null);
+        setOverrideStatusMap(Object.fromEntries((res.teachers || []).map((item) => [item.teacher.id, item.status === 'NOT_MARKED' ? 'PRESENT' : item.status])));
+      }
+    } catch (err) {
+      console.error('[TEACHER ATTENDANCE] Failed to load all teachers today:', err);
+      showToast('error', err.message || 'Failed to load teachers attendance list.');
+    } finally {
+      setTeacherLoading(false);
+    }
+  };
+
+  const handleMarkTeacherAttendance = async () => {
+    setTeacherMarkLoading(true);
+    try {
+      const payload = {
+        location: resolvedLocation.locationName || undefined,
+        latitude: resolvedLocation.latitude || undefined,
+        longitude: resolvedLocation.longitude || undefined,
+      };
+      const res = await api.markTeacherAttendance(payload);
+      if (res.success) {
+        showToast('success', res.message || 'Teacher attendance marked successfully.');
+        await fetchTeacherAttendance();
+      }
+    } catch (err) {
+      console.error('[TEACHER ATTENDANCE] Mark failed:', err);
+      showToast('error', err.message || 'Failed to mark teacher attendance.');
+    } finally {
+      setTeacherMarkLoading(false);
+    }
+  };
+
+  // Reason string for disabling the Mark button (null means enabled)
+  const markDisabledReason = teacherMarkLoading
+    ? 'Marking in progress...'
+    : teacherAttendance?.status
+      ? 'Attendance already marked for today.'
+      : (teacherWindow && teacherWindow.isClosed)
+        ? 'Attendance window closed — contact an administrator to mark.'
+        : null;
+
+  const handleOverrideTeacherAttendance = async (teacherId) => {
+    const status = overrideStatusMap[teacherId];
+    if (!status) {
+      showToast('error', 'Select a status before overriding teacher attendance.');
+      return;
+    }
+
+    setOverrideLoadingMap((prev) => ({ ...prev, [teacherId]: true }));
+    try {
+      const payload = {
+        teacherId,
+        date,
+        status,
+        location: resolvedLocation.locationName || undefined,
+        latitude: resolvedLocation.latitude || undefined,
+        longitude: resolvedLocation.longitude || undefined,
+      };
+      const res = await api.adminOverrideTeacherAttendance(payload);
+      if (res.success) {
+        showToast('success', res.message || 'Teacher attendance overridden successfully.');
+        await fetchAllTeachersToday();
+      }
+    } catch (err) {
+      console.error('[TEACHER ATTENDANCE] Override failed:', err);
+      showToast('error', err.message || 'Failed to override teacher attendance.');
+    } finally {
+      setOverrideLoadingMap((prev) => ({ ...prev, [teacherId]: false }));
+    }
+  };
+
+  const handleTeacherStatusChange = (teacherId, nextStatus) => {
+    setOverrideStatusMap((prev) => ({ ...prev, [teacherId]: nextStatus }));
+  };
+
   const handleSave = async () => {
     console.log('[ATTENDANCE] handleSave triggered. selectedCourse:', selectedCourse, 'records:', JSON.stringify(records, null, 2));
     if (!selectedCourse || records.length === 0) {
@@ -371,7 +517,7 @@ const MarkAttendance = () => {
         .map((r) => ({ 
           studentId: r.studentId, 
           status: r.status,
-          location: locationName || 'Unknown Location',
+          location: locationName || 'Lahore, Pakistan',
           latitude: latitude || null,
           longitude: longitude || null,
         }));
@@ -418,6 +564,10 @@ const MarkAttendance = () => {
     }
   };
 
+  const showQRCodeImage = mainTab === 'teacher'
+    ? !teacherAttendance?.status
+    : (isStudentRole ? records[0]?.status === 'PENDING' : true);
+
   const presentCount = records.filter(r => r.status === 'PRESENT').length;
   const absentCount = records.filter(r => r.status === 'ABSENT').length;
 
@@ -436,8 +586,27 @@ const MarkAttendance = () => {
         </div>
       )}
 
+      {/* Top Tabs */}
+      {!isStudentRole && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMainTab('mark')}
+            className={`px-3 py-2 rounded-t-lg border-b-2 ${mainTab === 'mark' ? 'border-brand-dark font-semibold' : 'border-transparent text-slate-500'}`}
+          >
+            Mark Attendance
+          </button>
+          <button
+            onClick={() => setMainTab('teacher')}
+            className={`px-3 py-2 rounded-t-lg border-b-2 ${mainTab === 'teacher' ? 'border-brand-dark font-semibold' : 'border-transparent text-slate-500'}`}
+          >
+            Teacher Attendance
+          </button>
+        </div>
+      )}
+
       {/* Filters Row */}
-      <div className="flex flex-wrap gap-4 items-end bg-slate-50 border border-slate-200 rounded-lg p-5">
+      {mainTab === 'mark' && (
+        <div className="flex flex-wrap gap-4 items-end bg-slate-50 border border-slate-200 rounded-lg p-5">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Course</label>
           <div className="relative">
@@ -471,14 +640,143 @@ const MarkAttendance = () => {
 
         {isStudentRole && selectedCourse && records[0]?.status === 'PENDING' && (
           <button
-            onClick={() => setShowQRModal(true)}
+            onClick={() => { setShowQRModal(true); fetchQRToken(); }}
             className="btn btn-blue"
           >
             <QrCode size={16} />
             Get Check-in QR
           </button>
         )}
-      </div>
+        </div>
+      )}
+
+      {mainTab === 'teacher' && (userRole === 'TEACHER' || userRole === 'ADMIN') && (
+        <div className="space-y-4 mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Teacher Attendance</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                {userRole === 'TEACHER'
+                  ? 'Track your own check-in status for today.'
+                  : 'Review and override today’s teacher attendance records.'}
+              </p>
+            </div>
+                  {userRole === 'TEACHER' ? (
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={handleMarkTeacherAttendance}
+                          disabled={Boolean(markDisabledReason)}
+                          title={markDisabledReason || 'Mark My Attendance'}
+                          aria-disabled={Boolean(markDisabledReason)}
+                          className="inline-flex items-center gap-2 rounded-lg bg-brand-dark px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                        >
+                          {teacherMarkLoading ? 'Marking...' : teacherAttendance?.status ? 'Attendance Marked' : 'Mark My Attendance'}
+                        </button>
+                        <button
+                            onClick={() => { setShowQRModal(true); fetchQRToken(); }}
+                          disabled={Boolean(markDisabledReason)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                        >
+                          <QrCode size={16} />
+                          Get Check-in QR
+                        </button>
+                      </div>
+                      {markDisabledReason && !teacherAttendance?.status && (
+                        <p className="text-xs text-slate-500 mt-1">{markDisabledReason}</p>
+                      )}
+                    </div>
+                  ) : null}
+          </div>
+
+          {teacherLoading ? (
+            <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+              <RefreshCcw size={16} className="animate-spin" /> Loading teacher attendance...
+            </div>
+          ) : userRole === 'TEACHER' ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+                <span className="block text-xs uppercase tracking-wider text-slate-500">Status</span>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  {teacherAttendance?.status || 'Not marked yet'}
+                </p>
+              </div>
+
+            {qrError && (
+              <div className="text-xs text-red-600 mt-2">
+                {qrError}
+                <button onClick={() => fetchQRToken()} className="ml-2 text-blue-600 underline">Retry</button>
+              </div>
+            )}
+              <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+                <span className="block text-xs uppercase tracking-wider text-slate-500">Marked By</span>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  {teacherAttendance?.markedByRole || 'Teacher self-check'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+                <span className="block text-xs uppercase tracking-wider text-slate-500">Window</span>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  {teacherWindow ? `${new Date(teacherWindow.classTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(teacherWindow.lateDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Today'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-600">
+                    <th className="px-4 py-3 text-left uppercase tracking-wide">#</th>
+                    <th className="px-4 py-3 text-left uppercase tracking-wide">Teacher</th>
+                    <th className="px-4 py-3 text-left uppercase tracking-wide">Email</th>
+                    <th className="px-4 py-3 text-left uppercase tracking-wide">Status</th>
+                    <th className="px-4 py-3 text-left uppercase tracking-wide">Override</th>
+                    <th className="px-4 py-3 text-left uppercase tracking-wide">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allTeachersToday.map((row, index) => (
+                    <tr key={row.teacher.id} className="border-b border-slate-200 bg-white hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-500">{index + 1}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-900">{row.teacher.name}</td>
+                      <td className="px-4 py-3 text-slate-500">{row.teacher.email}</td>
+                      <td className="px-4 py-3 text-slate-700 uppercase tracking-wide">
+                        {row.status}
+                        {row.attendance?.markedByRole ? ` • ${row.attendance.markedByRole}` : ''}
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={overrideStatusMap[row.teacher.id] ?? (row.status === 'NOT_MARKED' ? 'PRESENT' : row.status)}
+                          onChange={(e) => handleTeacherStatusChange(row.teacher.id, e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-dark/15"
+                        >
+                          {TEACHER_STATUS_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleOverrideTeacherAttendance(row.teacher.id)}
+                          disabled={overrideLoadingMap[row.teacher.id] || overrideStatusMap[row.teacher.id] === row.status}
+                          className="rounded-lg bg-brand-dark px-3 py-2 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {overrideLoadingMap[row.teacher.id] ? 'Saving...' : 'Override'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {teacherWindow && (
+            <p className="mt-4 text-xs text-slate-500">
+              Attendance window closes at {new Date(teacherWindow.lateDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Admins can still override after the window closes.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* --- PREMIUM LOCATION STATUS CARD --- */}
       {selectedCourse && (
@@ -524,10 +822,6 @@ const MarkAttendance = () => {
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                       Custom Location
                     </span>
-                  ) : resolvedLocation.source === 'ERROR' ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                      Manual Fallback
-                    </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                       Approximate City (IP)
@@ -539,7 +833,7 @@ const MarkAttendance = () => {
                   <div className="h-5 w-48 bg-slate-100 rounded animate-pulse mt-1.5"></div>
                 ) : (
                   <h4 className="text-sm font-bold text-slate-800 mt-1">
-                    {resolvedLocation.locationName || 'Unknown Location'}
+                    {resolvedLocation.locationName || 'Lahore, Pakistan'}
                   </h4>
                 )}
 
@@ -598,139 +892,142 @@ const MarkAttendance = () => {
       )}
 
       {/* ── MAIN CONTENT ── */}
-      {!selectedCourse ? (
-        <div className="py-20 flex flex-col items-center gap-3 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-          <div className="p-4 bg-white rounded-lg shadow-sm">
-            <RefreshCcw size={28} className="text-slate-300" />
-          </div>
-          <p className="text-sm font-medium">Select a course to load student records</p>
-        </div>
-      ) : loading ? (
-        <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
-          <RefreshCcw size={28} className="animate-spin text-brand-dark" />
-          <p className="text-sm">Loading attendance details...</p>
-        </div>
-      ) : records.length === 0 ? (
-        <div className="py-20 flex flex-col items-center gap-3 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-          <p className="text-sm font-medium">No records found for this course.</p>
-        </div>
-      ) : (
-        <>
-          {/* Summary + Mark-All (non-students only) */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex gap-3">
-              <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <CheckCircle size={13} /> {presentCount} Present
-              </span>
-              <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200">
-                <XCircle size={13} /> {absentCount} Absent
-              </span>
+      {mainTab === 'mark' ? (
+        !selectedCourse ? (
+          <div className="py-20 flex flex-col items-center gap-3 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <div className="p-4 bg-white rounded-lg shadow-sm">
+              <RefreshCcw size={28} className="text-slate-300" />
             </div>
-            {!isStudentRole && (
-              <div className="flex gap-2 text-xs">
-                <span className="text-slate-400 font-medium self-center">Mark all:</span>
-                {STATUS_OPTIONS.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => markAll(s)}
-                    className={`px-3 py-1.5 rounded-lg border font-semibold transition-all hover:opacity-80 ${statusStyle[s]}`}
-                  >
-                    {s}
-                  </button>
-                ))}
+            <p className="text-sm font-medium">Select a course to load student records</p>
+          </div>
+        ) : loading ? (
+          <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
+            <RefreshCcw size={28} className="animate-spin text-brand-dark" />
+            <p className="text-sm">Loading attendance details...</p>
+          </div>
+        ) : records.length === 0 ? (
+          <div className="py-20 flex flex-col items-center gap-3 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <p className="text-sm font-medium">No records found for this course.</p>
+          </div>
+        ) : (
+          <>
+            {/* Summary + Mark-All (non-students only) */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex gap-3">
+                <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <CheckCircle size={13} /> {presentCount} Present
+                </span>
+                <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200">
+                  <XCircle size={13} /> {absentCount} Absent
+                </span>
               </div>
-            )}
-          </div>
+              {!isStudentRole && (
+                <div className="flex gap-2 text-xs">
+                  <span className="text-slate-400 font-medium self-center">Mark all:</span>
+                  {STATUS_OPTIONS.map(s => (
+                    <button
+                      key={s}
+                      onClick={() => markAll(s)}
+                      className={`px-3 py-1.5 rounded-lg border font-semibold transition-all hover:opacity-80 ${statusStyle[s]}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Table */}
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">#</th>
-                  <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Student</th>
-                  <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Email</th>
-                  <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((r, i) => (
-                  <tr key={r.studentId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">
-                    <td className="px-5 py-3.5 text-slate-400 font-medium">{i + 1}</td>
-                    <td className="px-5 py-3.5 font-semibold text-slate-800">{r.name}</td>
-                    <td className="px-5 py-3.5 text-slate-500">{r.email}</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex gap-2">
-                          {STATUS_OPTIONS.map(s => {
-                            const isSelected = r.status === s;
-                            const isLockedForRole = isLockedForCurrentUser(r);
-                            const isGraceOver = isStudentRole && courseDetails?.time && isGracePeriodOver(courseDetails.time, date);
-                            const isDisabled = isLockedForRole || isGraceOver;
-
-                            return (
-                              <button
-                                key={s}
-                                disabled={isDisabled}
-                                onClick={() => setStatus(r.studentId, s)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all
-                                  ${isSelected
-                                    ? `${statusStyle[s]} shadow-sm`
-                                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 disabled:hover:border-slate-200'
-                                  }
-                                  ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'active:scale-95'}`}
-                              >
-                                {isSelected && statusIcon[s]}
-                                {s === 'PRESENT' ? 'Present' : 'Absent'}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {/* Premium "Updated by {role}" badge */}
-                        {r.markedByRole && (
-                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-300 shadow-sm ${
-                            r.markedByRole === 'ADMIN' 
-                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200/60 shadow-indigo-100/40' 
-                              : r.markedByRole === 'TEACHER' 
-                                ? 'bg-amber-50 text-amber-700 border-amber-200/60 shadow-amber-100/40' 
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200/60 shadow-emerald-100/40'
-                          }`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${
-                              r.markedByRole === 'ADMIN' ? 'bg-indigo-500' : r.markedByRole === 'TEACHER' ? 'bg-amber-500' : 'bg-emerald-500'
-                            }`} />
-                            Updated by {r.markedByRole === 'ADMIN' ? 'Admin' : r.markedByRole === 'TEACHER' ? 'Teacher' : 'Student'}
-                          </div>
-                        )}
-                      </div>
-                    </td>
+            {/* Table */}
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">#</th>
+                    <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Student</th>
+                    <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Email</th>
+                    <th className="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {records.map((r, i) => (
+                    <tr key={r.studentId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">
+                      <td className="px-5 py-3.5 text-slate-400 font-medium">{i + 1}</td>
+                      <td className="px-5 py-3.5 font-semibold text-slate-800">{r.name}</td>
+                      <td className="px-5 py-3.5 text-slate-500">{r.email}</td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex gap-2">
+                            {STATUS_OPTIONS.map(s => {
+                              const isSelected = r.status === s;
+                              const isLockedForRole = isLockedForCurrentUser(r);
+                              const isGraceOver = isStudentRole && courseDetails?.time && isGracePeriodOver(courseDetails.time, date);
+                              const isDisabled = isLockedForRole || isGraceOver;
 
-          {/* Save Button */}
-          <div className="flex justify-end">
-            {(() => {
-              const isLockedForSave = records.every(r => {
-                const isLockedForThisRow = isLockedForCurrentUser(r);
-                const isGraceOverForThisRow = isStudentRole && courseDetails?.time && isGracePeriodOver(courseDetails.time, date);
-                return isLockedForThisRow || isGraceOverForThisRow;
-              });
-              return (
-                <button
-                  onClick={handleSave}
-                  disabled={saving || isLockedForSave}
-                  className="flex items-center gap-2 bg-brand-dark text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-brand-hover active:scale-[0.98] transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Save size={16} />
-                  {saving ? 'Saving...' : 'Save Attendance'}
-                </button>
-              );
-            })()}
-          </div>
-        </>
-      )}
+                              return (
+                                <button
+                                  key={s}
+                                  disabled={isDisabled}
+                                  onClick={() => setStatus(r.studentId, s)}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all
+                                    ${isSelected
+                                      ? `${statusStyle[s]} shadow-sm`
+                                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 disabled:hover:border-slate-200'
+                                    }
+                                    ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'active:scale-95'}`}
+                                >
+                                  {isSelected && statusIcon[s]}
+                                  {s === 'PRESENT' ? 'Present' : 'Absent'}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {/* Premium "Updated by {role}" badge */}
+                          {r.markedByRole && (
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-300 shadow-sm ${
+                              r.markedByRole === 'ADMIN' 
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200/60 shadow-indigo-100/40' 
+                                : r.markedByRole === 'TEACHER' 
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200/60 shadow-amber-100/40' 
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200/60 shadow-emerald-100/40'
+                            }`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${
+                                r.markedByRole === 'ADMIN' ? 'bg-indigo-500' : r.markedByRole === 'TEACHER' ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`} />
+                              Updated by {r.markedByRole === 'ADMIN' ? 'Admin' : r.markedByRole === 'TEACHER' ? 'Teacher' : 'Student'}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              {(() => {
+                const isLockedForSave = records.every(r => {
+                  const isLockedForThisRow = isLockedForCurrentUser(r);
+                  const isGraceOverForThisRow = isStudentRole && courseDetails?.time && isGracePeriodOver(courseDetails.time, date);
+                  return isLockedForThisRow || isGraceOverForThisRow;
+                });
+                return (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || isLockedForSave}
+                    className="flex items-center gap-2 bg-brand-dark text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-brand-hover active:scale-[0.98] transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Save size={16} />
+                    {saving ? 'Saving...' : 'Save Attendance'}
+                  </button>
+                );
+              })()}
+            </div>
+          </>
+        )
+      ) : null}
+
       {/* Dynamic QR Code Modal */}
       {showQRModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -740,10 +1037,14 @@ const MarkAttendance = () => {
             <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3 mb-3.5">
               <div>
                 <h3 className="text-base font-bold text-slate-800">
-                  {isStudentRole ? 'My Check-in QR Code' : 'Dynamic Attendance QR'}
+                  {mainTab === 'teacher' ? 'Teacher Check-in QR Code' : isStudentRole ? 'My Check-in QR Code' : 'Dynamic Attendance QR'}
                 </h3>
                 <p className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
-                  {isStudentRole ? 'Scan with your phone to mark attendance' : 'Scannable check-in for students'}
+                  {mainTab === 'teacher'
+                    ? 'Scan with your phone to mark teacher attendance'
+                    : isStudentRole
+                      ? 'Scan with your phone to mark attendance'
+                      : 'Scannable check-in for students'}
                 </p>
               </div>
               <button
@@ -757,20 +1058,20 @@ const MarkAttendance = () => {
             {/* Content / Info Card */}
             <div className="w-full bg-slate-50 border border-slate-200/60 rounded-xl p-3 mb-3.5 text-center">
               <span className="text-[10px] font-semibold text-brand-dark bg-blue-50 px-2 py-0.5 rounded-full">
-                {courses.find(c => String(c.id) === String(selectedCourse))?.name || 'Course'}
+                {mainTab === 'teacher' ? 'Teacher Attendance' : (courses.find(c => String(c.id) === String(selectedCourse))?.name || 'Course')}
               </span>
               <h4 className="text-xs font-bold text-slate-700 mt-1.5">
                 Scan QR to Automatically Mark Present
               </h4>
               <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
-                {isStudentRole
+                {isStudentRole || mainTab === 'teacher'
                   ? "Open your phone's camera, scan the QR code, and log in to verify your identity."
                   : 'Dynamic code expires & rotates automatically.'}
               </p>
             </div>
 
             {/* QR Display */}
-            {(!isStudentRole || records[0]?.status === 'PENDING') && (
+            {showQRCodeImage && (
               <div className="relative p-2 bg-gradient-to-tr from-slate-100 to-white border border-slate-200/80 rounded-xl shadow-inner mb-3.5 flex items-center justify-center min-h-[200px] min-w-[200px]">
                 {qrLoading || !qrToken ? (
                   <div className="flex flex-col items-center gap-1.5 text-slate-400">
@@ -785,7 +1086,7 @@ const MarkAttendance = () => {
                           return origin.replace(hostname, devIP);
                         }
                         return origin;
-                      })(window.location.origin, window.location.hostname, import.meta.env.VITE_DEV_IP)}/#/check-in?courseId=${selectedCourse}&token=${qrToken}${isStudentRole ? `&desktopUserId=${loggedInUser.id}` : ''}`
+                      })(window.location.origin, window.location.hostname, import.meta.env.VITE_DEV_IP)}/#/check-in?courseId=${selectedCourse || '0'}&token=${qrToken}${isStudentRole ? `&desktopUserId=${loggedInUser.id}` : (mainTab === 'teacher' ? `&desktopUserId=${loggedInUser.id}` : '')}`
                     )}`}
                     alt="Attendance Scan QR Code"
                     className="w-[180px] h-[180px] rounded-lg select-none"
@@ -801,14 +1102,16 @@ const MarkAttendance = () => {
             )}
 
             {/* Status display / real-time counts */}
-            {isStudentRole ? (
+            {(isStudentRole || mainTab === 'teacher') ? (
               <div className="w-full border-t border-slate-100 pt-3.5">
-                {records[0]?.status === 'PRESENT' ? (
+                {(isStudentRole ? records[0]?.status === 'PRESENT' : (teacherAttendance?.status === 'PRESENT' || teacherAttendance?.status === 'LATE')) ? (
                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center flex flex-col items-center animate-fade-in-up">
                     <div className="inline-flex items-center justify-center p-1 bg-emerald-500 rounded-full text-white mb-1 shadow-sm shadow-emerald-500/25">
                       <CheckCircle size={14} />
                     </div>
-                    <p className="text-xs font-extrabold text-emerald-800 leading-tight">PRESENT</p>
+                    <p className="text-xs font-extrabold text-emerald-800 leading-tight">
+                      {isStudentRole ? 'PRESENT' : teacherAttendance.status}
+                    </p>
                     <p className="text-[10px] text-emerald-600 mt-0.5 font-medium leading-tight">Your attendance has been successfully recorded!</p>
                   </div>
                 ) : (
@@ -840,11 +1143,13 @@ const MarkAttendance = () => {
 
             {/* Live activity ticker */}
             <div className="w-full mt-2.5 flex items-center justify-center gap-1.5 text-[10px] font-medium text-slate-400">
-              <span className={`inline-block h-1.5 w-1.5 rounded-full animate-pulse ${(isStudentRole && records[0]?.status === 'PRESENT') ? 'bg-emerald-500' : 'bg-brand-dark'}`}></span>
+              <span className={`inline-block h-1.5 w-1.5 rounded-full animate-pulse ${((isStudentRole && records[0]?.status === 'PRESENT') || (mainTab === 'teacher' && (teacherAttendance?.status === 'PRESENT' || teacherAttendance?.status === 'LATE'))) ? 'bg-emerald-500' : 'bg-brand-dark'}`}></span>
               <span>
                 {isStudentRole
                   ? (records[0]?.status === 'PRESENT' ? 'Check-in completed successfully!' : 'Waiting for scan on your mobile device...')
-                  : 'Waiting for students to check in...'}
+                  : mainTab === 'teacher'
+                    ? ((teacherAttendance?.status === 'PRESENT' || teacherAttendance?.status === 'LATE') ? 'Check-in completed successfully!' : 'Waiting for scan on your mobile device...')
+                    : 'Waiting for students to check in...'}
               </span>
             </div>
 

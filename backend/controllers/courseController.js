@@ -133,26 +133,57 @@ export const updateCourse = async (req, res) => {
 export const deleteCourse = async (req, res) => {
   try {
     const { id } = req.params;
+    const { cascade } = req.query;
     const courseId = parseInt(id);
 
-    // Check if course has enrollments or attendance (prevent deletion if so)
+    console.log(`[BACKEND deleteCourse] Request to delete course ID: ${courseId}, cascade: ${cascade}`);
+
+    const existingCourse = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true }
+    });
+
+    if (!existingCourse) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
     const enrollmentsCount = await prisma.enrollment.count({
       where: { courseId }
     });
+    const attendanceCount = await prisma.attendance.count({
+      where: { courseId }
+    });
 
-    if (enrollmentsCount > 0) {
+    console.log(`[BACKEND deleteCourse] Course ID ${courseId} has enrollmentsCount: ${enrollmentsCount}, attendanceCount: ${attendanceCount}`);
+
+    // If cascade is not requested and records exist, return requiresCascade true
+    if ((enrollmentsCount > 0 || attendanceCount > 0) && cascade !== 'true') {
+      console.log(`[BACKEND deleteCourse] Course ID ${courseId} requires cascading. Returning 400 with requiresCascade: true`);
       return res.status(400).json({ 
         success: false, 
-        message: 'Cannot delete course with active enrollments. Remove students first.' 
+        requiresCascade: true,
+        message: 'Deleting the course will delete the attendance record!' 
       });
     }
 
-    await prisma.course.delete({
-      where: { id: courseId }
-    });
+    if (cascade === 'true') {
+      console.log(`[BACKEND deleteCourse] Cascading deletion for Course ID ${courseId}...`);
+      await prisma.$transaction([
+        prisma.attendance.deleteMany({ where: { courseId } }),
+        prisma.enrollment.deleteMany({ where: { courseId } }),
+        prisma.course.delete({ where: { id: courseId } })
+      ]);
+      console.log(`[BACKEND deleteCourse] Successfully cascade deleted Course ID ${courseId} and all associated attendance and enrollment records.`);
+    } else {
+      await prisma.course.delete({
+        where: { id: courseId }
+      });
+      console.log(`[BACKEND deleteCourse] Successfully deleted Course ID ${courseId} (no dependents existed).`);
+    }
 
     res.json({ success: true, message: 'Course deleted successfully' });
   } catch (error) {
+    console.error(`[BACKEND deleteCourse] Error deleting course ID ${courseId}:`, error);
     res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
   }
 };

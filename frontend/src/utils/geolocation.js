@@ -88,8 +88,8 @@ export const getCurrentLocation = () => {
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000, // Increased timeout to 10 seconds to allow WiFi/BSSID scanning on desktops
-        maximumAge: 300000, // Use cached location up to 5 minutes old to make resolving instant if already queried
+        timeout: 10000, 
+        maximumAge: 300000,
       }
     );
   });

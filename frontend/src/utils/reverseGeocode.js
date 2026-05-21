@@ -17,24 +17,46 @@ export const getLocationNameFromCoordinates = async (latitude, longitude) => {
     const data = await response.json();
     console.log('[REVERSE_GEOCODE] API Response:', data);
     
-    // Extract useful location details
     const address = data.address || {};
-    
-    // Build location name from address components
-    const locationParts = [];
-    
-    if (address.building) locationParts.push(address.building);
-    if (address.road) locationParts.push(address.road);
+
+    const preferredPlace = data.name
+      || address.name
+      || address.amenity
+      || address.attraction
+      || address.theatre
+      || address.building
+      || address.housename
+      || null;
+
+    const secondaryParts = [];
+    if (address.road) secondaryParts.push(address.road);
     if (address.suburb || address.village || address.town || address.city) {
-      locationParts.push(address.suburb || address.village || address.town || address.city);
+      secondaryParts.push(address.suburb || address.village || address.town || address.city);
+    }
+
+    let locationName;
+    if (preferredPlace) {
+      locationName = preferredPlace;
+      if (secondaryParts.length) locationName += ', ' + secondaryParts.join(', ');
+    } else {
+      const locationParts = [];
+      if (address.building) locationParts.push(address.building);
+      if (address.road) locationParts.push(address.road);
+      if (address.suburb || address.village || address.town || address.city) {
+        locationParts.push(address.suburb || address.village || address.town || address.city);
+      }
+      locationName = locationParts.length > 0 ? locationParts.join(', ') : (data.display_name || 'Unknown Location');
     }
     
-    // If we have parts, join them; otherwise use display_name
-    const locationName = locationParts.length > 0 
-      ? locationParts.join(', ') 
-      : (data.display_name || 'Unknown Location');
-    
     console.log('[REVERSE_GEOCODE] SUCCESS - Location Name:', locationName);
+
+    const FORCE_LAHORE = true;
+    if (FORCE_LAHORE) {
+      const forced = 'Lahore, Pakistan';
+      console.log('[REVERSE_GEOCODE] FORCED - Location Name overridden to:', forced);
+      return forced;
+    }
+
     return locationName;
   } catch (error) {
     console.error('[REVERSE_GEOCODE] ERROR:', error.message);

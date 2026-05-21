@@ -52,16 +52,25 @@ const CoursesList = ({ onEdit }) => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this course?')) {
-      try {
-        const response = await axios.delete(`${import.meta.env.VITE_API_URL}/courses/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (response.data.success) {
-          fetchCourses();
+  const handleDelete = async (id, force = false) => {
+    if (!force && !window.confirm('Are you sure you want to delete this course?')) {
+      return;
+    }
+
+    try {
+      const url = `${import.meta.env.VITE_API_URL}/courses/${id}${force ? '?cascade=true' : ''}`;
+      const response = await axios.delete(url, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.data.success) {
+        fetchCourses();
+      }
+    } catch (error) {
+      if (error.response?.data?.requiresCascade) {
+        if (window.confirm('Deleting the course will delete the attendance record!\nAre you sure you want to proceed and delete them too?')) {
+          handleDelete(id, true);
         }
-      } catch (error) {
+      } else {
         const message = error.response?.data?.message || 'Failed to delete course';
         alert(message);
       }

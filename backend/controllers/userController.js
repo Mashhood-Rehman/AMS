@@ -195,14 +195,67 @@ export const getAllUsers = async (req, res) => {
 
 export const deleteUser = async (req, res) => {
   const { id } = req.params;
+  const userId = parseInt(id);
+
   try {
-    await prisma.user.delete({
-      where: { id: parseInt(id) }
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true }
     });
 
-    res.json({ success: true, message: 'User deleted successfully' });
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await prisma.$transaction(async (prismaTx) => {
+
+      // Remove teacher from courses
+      if (targetUser.role === 'TEACHER') {
+        await prismaTx.course.updateMany({
+          where: { teacherId: userId },
+          data: { teacherId: null }
+        });
+
+        // DELETE teacher attendance records
+        await prismaTx.teacherAttendance.deleteMany({
+          where: { teacherId: userId }
+        });
+      }
+
+      // Delete student-related records
+      await prismaTx.alert.deleteMany({
+        where: { studentId: userId }
+      });
+
+      await prismaTx.attendance.deleteMany({
+        where: { studentId: userId }
+      });
+
+      await prismaTx.enrollment.deleteMany({
+        where: { studentId: userId }
+      });
+
+      // Finally delete user
+      await prismaTx.user.delete({
+        where: { id: userId }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
