@@ -39,6 +39,40 @@ export const markAttendance = async (req, res) => {
 
     const dateKey = toDateKey(date);
 
+    // Resolve userRole
+    let userRole = req.userRole;
+    if (!userRole && req.userId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: parseInt(req.userId) } });
+      userRole = dbUser?.role;
+    }
+    userRole = userRole || 'STUDENT';
+
+    // Fetch existing attendance record to verify hierarchy
+    const existing = await prisma.attendance.findUnique({
+      where: {
+        studentId_courseId_date: {
+          studentId: parseInt(studentId),
+          courseId: parseInt(courseId),
+          date: dateKey,
+        },
+      },
+    });
+
+    if (existing) {
+      if (userRole === 'STUDENT' && (existing.markedByRole === 'TEACHER' || existing.markedByRole === 'ADMIN')) {
+        return res.status(403).json({
+          success: false,
+          message: `This attendance record has been locked by a ${existing.markedByRole.toLowerCase()}.`,
+        });
+      }
+      if (userRole === 'TEACHER' && existing.markedByRole === 'ADMIN') {
+        return res.status(403).json({
+          success: false,
+          message: 'This attendance record has been locked by an administrator.',
+        });
+      }
+    }
+
     const attendance = await prisma.attendance.upsert({
       where: {
         studentId_courseId_date: {
@@ -49,6 +83,7 @@ export const markAttendance = async (req, res) => {
       },
       update: {
         status,
+        markedByRole: userRole,
         location: location ?? undefined,
         latitude: latitude ? parseFloat(latitude) : undefined,
         longitude: longitude ? parseFloat(longitude) : undefined,
@@ -61,6 +96,7 @@ export const markAttendance = async (req, res) => {
         date: dateKey,
         markedAt: new Date(),
         status,
+        markedByRole: userRole,
         location: location ?? null,
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
@@ -198,10 +234,33 @@ export const updateAttendance = async (req, res) => {
       }
     }
 
+    // Resolve userRole
+    let userRole = req.userRole;
+    if (!userRole && req.userId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: parseInt(req.userId) } });
+      userRole = dbUser?.role;
+    }
+    userRole = userRole || 'STUDENT';
+
+    // Verify role hierarchy
+    if (userRole === 'STUDENT' && (existing.markedByRole === 'TEACHER' || existing.markedByRole === 'ADMIN')) {
+      return res.status(403).json({
+        success: false,
+        message: `This attendance record has been locked by a ${existing.markedByRole.toLowerCase()}.`,
+      });
+    }
+    if (userRole === 'TEACHER' && existing.markedByRole === 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'This attendance record has been locked by an administrator.',
+      });
+    }
+
     const updated = await prisma.attendance.update({
       where: { id: parseInt(id) },
       data: {
         status:   status   ?? existing.status,
+        markedByRole: userRole,
         location: location !== undefined ? location : existing.location,
         notes:    notes    !== undefined ? notes    : existing.notes,
       },
@@ -406,8 +465,11 @@ export const getAttendanceSummary = async (req, res) => {
 export const bulkMarkAttendance = async (req, res) => {
   try {
     const { courseId, date, records } = req.body;
+    console.log('[BACKEND bulkMarkAttendance] Request received. courseId:', courseId, 'date:', date);
+    console.log('[BACKEND bulkMarkAttendance] Records to save:', JSON.stringify(records, null, 2));
 
     if (!courseId || !Array.isArray(records) || records.length === 0) {
+      console.warn('[BACKEND bulkMarkAttendance] Invalid body parameters.');
       return res.status(400).json({
         success: false,
         message: 'courseId and a non-empty records array are required.',
@@ -416,28 +478,73 @@ export const bulkMarkAttendance = async (req, res) => {
 
     const course = await prisma.course.findUnique({ where: { id: parseInt(courseId) } });
     if (!course) {
+      console.warn('[BACKEND bulkMarkAttendance] Course not found for ID:', courseId);
       return res.status(404).json({ success: false, message: 'Course not found.' });
     }
 
     const validStatuses = ['PRESENT', 'ABSENT', 'LATE'];
     const dateKey       = toDateKey(date);
+    console.log('[BACKEND bulkMarkAttendance] Resolved dateKey:', dateKey.toISOString());
     const results       = [];
     const errors        = [];
 
+    // Resolve userRole
+    let userRole = req.userRole;
+    if (!userRole && req.userId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: parseInt(req.userId) } });
+      userRole = dbUser?.role;
+    }
+    userRole = userRole || 'STUDENT';
+    console.log('[BACKEND bulkMarkAttendance] User making request - ID:', req.userId, 'Role:', userRole);
+
     for (const record of records) {
       const { studentId, status, location, latitude, longitude, notes } = record;
+      console.log(`[BACKEND bulkMarkAttendance] Processing studentId: ${studentId}, status: ${status}`);
 
       if (!studentId || !status) {
+        console.warn(`[BACKEND bulkMarkAttendance] Missing studentId or status for record:`, record);
         errors.push({ studentId, reason: 'studentId and status are required.' });
         continue;
       }
 
+      if (status === 'PENDING') {
+        console.warn(`[BACKEND bulkMarkAttendance] Skipping studentId ${studentId} because status is PENDING.`);
+        continue;
+      }
+
       if (!validStatuses.includes(status)) {
+        console.warn(`[BACKEND bulkMarkAttendance] Invalid status "${status}" for studentId:`, studentId);
         errors.push({ studentId, reason: `Invalid status "${status}".` });
         continue;
       }
 
       try {
+        // Fetch existing attendance record to verify hierarchy
+        const existing = await prisma.attendance.findUnique({
+          where: {
+            studentId_courseId_date: {
+              studentId: parseInt(studentId),
+              courseId: parseInt(courseId),
+              date: dateKey,
+            },
+          },
+        });
+        console.log(`[BACKEND bulkMarkAttendance] Existing record for studentId ${studentId}:`, existing);
+
+        if (existing) {
+          if (userRole === 'STUDENT' && (existing.markedByRole === 'TEACHER' || existing.markedByRole === 'ADMIN')) {
+            console.warn(`[BACKEND bulkMarkAttendance] Lock violation: Student blocked from modifying record marked by ${existing.markedByRole}`);
+            errors.push({ studentId, reason: `Locked by a ${existing.markedByRole.toLowerCase()}.` });
+            continue;
+          }
+          if (userRole === 'TEACHER' && existing.markedByRole === 'ADMIN') {
+            console.warn(`[BACKEND bulkMarkAttendance] Lock violation: Teacher blocked from modifying record marked by ADMIN`);
+            errors.push({ studentId, reason: 'Locked by an administrator.' });
+            continue;
+          }
+        }
+
+        console.log(`[BACKEND bulkMarkAttendance] Performing upsert for studentId: ${studentId}`);
         const upserted = await prisma.attendance.upsert({
           where: {
             studentId_courseId_date: {
@@ -448,6 +555,7 @@ export const bulkMarkAttendance = async (req, res) => {
           },
           update: {
             status,
+            markedByRole: userRole,
             location: location ?? undefined,
             latitude: latitude ? parseFloat(latitude) : undefined,
             longitude: longitude ? parseFloat(longitude) : undefined,
@@ -460,18 +568,22 @@ export const bulkMarkAttendance = async (req, res) => {
             date:      dateKey,
             markedAt:  new Date(),
             status,
+            markedByRole: userRole,
             location:  location ?? null,
             latitude:  latitude ? parseFloat(latitude) : null,
             longitude: longitude ? parseFloat(longitude) : null,
             notes:     notes    ?? null,
           },
         });
+        console.log(`[BACKEND bulkMarkAttendance] Upsert successful for studentId ${studentId}:`, upserted);
         results.push(upserted);
       } catch (err) {
+        console.error(`[BACKEND bulkMarkAttendance] Database error for studentId ${studentId}:`, err);
         errors.push({ studentId, reason: err.message });
       }
     }
 
+    console.log(`[BACKEND bulkMarkAttendance] Finished. Saved count: ${results.length}, Errors:`, errors);
     return res.status(200).json({
       success: true,
       message: `${results.length} record(s) saved. ${errors.length} error(s).`,
@@ -479,6 +591,7 @@ export const bulkMarkAttendance = async (req, res) => {
       errors,
     });
   } catch (error) {
+    console.error('[BACKEND bulkMarkAttendance] Critical controller error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error.', error: error.message });
   }
 };
@@ -634,6 +747,25 @@ export const markAttendanceQR = async (req, res) => {
 
     const dateKey = toDateKey(dateStr);
 
+    // Verify role hierarchy: QR scanning is always STUDENT role
+    const existing = await prisma.attendance.findUnique({
+      where: {
+        studentId_courseId_date: {
+          studentId: parseInt(studentId),
+          courseId: parseInt(courseId),
+          date: dateKey,
+        },
+      },
+    });
+
+    if (existing && (existing.markedByRole === 'TEACHER' || existing.markedByRole === 'ADMIN')) {
+      console.warn(`[QR ATTENDANCE VERIFICATION] FAILED: Locked by ${existing.markedByRole}`);
+      return res.status(403).json({
+        success: false,
+        message: `This attendance record has been locked by a ${existing.markedByRole.toLowerCase()}.`,
+      });
+    }
+
     const attendance = await prisma.attendance.upsert({
       where: {
         studentId_courseId_date: {
@@ -644,6 +776,7 @@ export const markAttendanceQR = async (req, res) => {
       },
       update: {
         status: 'PRESENT',
+        markedByRole: 'STUDENT',
         notes: 'Marked automatically via match-validated QR Code scan',
         location: req.body.location ?? undefined,
         markedAt: new Date(),
@@ -654,6 +787,7 @@ export const markAttendanceQR = async (req, res) => {
         date: dateKey,
         markedAt: new Date(),
         status: 'PRESENT',
+        markedByRole: 'STUDENT',
         location: req.body.location ?? null,
         notes: 'Marked automatically via match-validated QR Code scan',
       },

@@ -137,6 +137,37 @@ const Reports = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sendingAlerts, setSendingAlerts] = useState(false);
 
+  // Visual charts and dashboard state hooks
+  const [activeTab, setActiveTab] = useState('matrix'); // 'matrix' or 'analytics'
+  const [hoveredSlice, setHoveredSlice] = useState(null); // 'PRESENT', 'ABSENT', 'LATE'
+  const [hoveredPoint, setHoveredPoint] = useState(null); // point index in trend line chart
+  const [emailLoadingMap, setEmailLoadingMap] = useState({}); // mapping studentId -> boolean
+
+  // Individual Alert Dispatcher for At-Risk Students
+  const alertAtRiskStudent = async (student) => {
+    setEmailLoadingMap(prev => ({ ...prev, [student.id]: true }));
+    try {
+      const courseName = selectedCourseDetails ? `${selectedCourseDetails.name} (${selectedCourseDetails.code})` : 'subject';
+      const customMessage = `Hi ${student.name},\n\nThis is an attendance warning regarding your performance in the course ${courseName}.\n\nYour current attendance rate is ${student.rate}%, which falls below the mandatory 75% requirement. Please prioritize attending the remaining classes and contact your teacher if you have any extenuating circumstances.`;
+      
+      const res = await api.sendManualAttendanceAlert({
+        studentId: student.id,
+        customMessage
+      });
+
+      if (res.success) {
+        toast.success(`Warning notice successfully sent to ${student.name}!`);
+      } else {
+        toast.error(res.message || `Failed to alert ${student.name}.`);
+      }
+    } catch (err) {
+      console.error('Error dispatching manual alert:', err);
+      toast.error(err.message || 'Error occurred while sending the email warning.');
+    } finally {
+      setEmailLoadingMap(prev => ({ ...prev, [student.id]: false }));
+    }
+  };
+
   const triggerLowAttendanceAlerts = async () => {
     if (!selectedCourse || !selectedClass) {
       toast.info('Please select a subject and class first.');
@@ -427,6 +458,91 @@ const Reports = () => {
       totalRecords: totalPresent + totalLate + totalAbsent
     };
   }, [processedData]);
+
+  // Memos for charts & visual analytics
+  const donutData = React.useMemo(() => {
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+    attendanceRecords.forEach(r => {
+      if (r.status === 'PRESENT') present++;
+      else if (r.status === 'ABSENT') absent++;
+      else if (r.status === 'LATE') late++;
+    });
+    const total = present + absent + late;
+    const presentPct = total > 0 ? (present / total) * 100 : 0;
+    const latePct = total > 0 ? (late / total) * 100 : 0;
+    const absentPct = total > 0 ? (absent / total) * 100 : 0;
+    return { present, absent, late, total, presentPct, latePct, absentPct };
+  }, [attendanceRecords]);
+
+  const dayOfWeekData = React.useMemo(() => {
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const counts = weekdayNames.map(name => ({ name, present: 0, late: 0, absent: 0, total: 0 }));
+    
+    attendanceRecords.forEach(rec => {
+      const d = parseLocalDate(rec.date);
+      if (d) {
+        const dayIdx = d.getDay();
+        if (rec.status === 'PRESENT') counts[dayIdx].present++;
+        else if (rec.status === 'LATE') counts[dayIdx].late++;
+        else if (rec.status === 'ABSENT') counts[dayIdx].absent++;
+        counts[dayIdx].total++;
+      }
+    });
+    
+    return counts.map(item => {
+      const rate = item.total > 0 ? Math.round(((item.present + item.late) / item.total) * 100) : 0;
+      return {
+        ...item,
+        rate
+      };
+    }).filter(item => item.total > 0 || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].includes(item.name));
+  }, [attendanceRecords]);
+
+  const trendData = React.useMemo(() => {
+    if (!processedData.uniqueDates.length || !attendanceRecords.length) return [];
+    
+    const dateGroups = {};
+    attendanceRecords.forEach(rec => {
+      const key = getLocalDateKey(rec.date);
+      if (!dateGroups[key]) {
+        dateGroups[key] = { present: 0, late: 0, absent: 0, total: 0 };
+      }
+      if (rec.status === 'PRESENT') dateGroups[key].present++;
+      else if (rec.status === 'LATE') dateGroups[key].late++;
+      else if (rec.status === 'ABSENT') dateGroups[key].absent++;
+      dateGroups[key].total++;
+    });
+    
+    return processedData.uniqueDates.map(dateKey => {
+      const grp = dateGroups[dateKey] || { present: 0, late: 0, absent: 0, total: 0 };
+      const rate = grp.total > 0 ? Math.round(((grp.present + grp.late) / grp.total) * 100) : 0;
+      return {
+        date: dateKey,
+        rate,
+        total: grp.total
+      };
+    });
+  }, [processedData.uniqueDates, attendanceRecords]);
+
+  const riskSegmentation = React.useMemo(() => {
+    const excellent = [];
+    const average = [];
+    const atRisk = [];
+    
+    processedData.studentStats.forEach(student => {
+      if (student.rate >= 90) {
+        excellent.push(student);
+      } else if (student.rate >= 75) {
+        average.push(student);
+      } else {
+        atRisk.push(student);
+      }
+    });
+    
+    return { excellent, average, atRisk };
+  }, [processedData.studentStats]);
 
   // Export to CSV Function
   const exportToCSV = () => {
@@ -952,244 +1068,748 @@ const Reports = () => {
         </div>
       )}
 
-      {/* Main Attendance Matrix Grid Card */}
-      <div 
-        className="print-full-width" 
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #cbd5e1',
-          borderRadius: '16px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Table Controls (Search & Export) */}
-        {processedData.studentStats.length > 0 && (
-          <div 
-            className="no-print" 
-            style={{
-              padding: '16px 20px',
-              borderBottom: '1px solid #cbd5e1',
-              display: 'flex',
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: '12px',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: 'rgba(248, 250, 252, 0.5)'
-            }}
-          >
-            {/* Student Search */}
-            <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
-              <Search size={14} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
-              <input
-                type="text"
-                placeholder="Search students..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ width: '100%', paddingLeft: '36px', paddingRight: '16px', paddingTop: '8px', paddingBottom: '8px', fontSize: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', outline: 'none' }}
-              />
-            </div>
-
-            {/* Export & Print */}
-            <div style={{ display: 'flex', gap: '8px', width: 'auto' }}>
-              <button
-                onClick={exportToCSV}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontWeight: '600', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}
-              >
-                <Download size={14} />
-                Export CSV
-              </button>
-              <button
-                onClick={downloadPDF}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#1e293b', color: '#ffffff', fontWeight: '600', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-              >
-                <FileText size={14} />
-                Save PDF Report
-              </button>
-              {!isStudent && reportType === 'monthly' && (
-                <button
-                  onClick={triggerLowAttendanceAlerts}
-                  disabled={sendingAlerts}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    backgroundColor: '#fff5f5',
-                    color: '#c53030',
-                    border: '1px solid #feb2b2',
-                    fontWeight: '600',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    cursor: sendingAlerts ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!sendingAlerts) {
-                      e.currentTarget.style.backgroundColor = '#fed7d7';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!sendingAlerts) {
-                      e.currentTarget.style.backgroundColor = '#fff5f5';
-                    }
-                  }}
-                >
-                  <Mail size={14} style={{ color: '#c53030' }} />
-                  {sendingAlerts ? 'Sending Alerts...' : 'Alert Low Attendance'}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* The Grid / Table Wrapper */}
-        {loading ? (
-          <div style={{ padding: '96px 0', textAlign: 'center', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-            <RefreshCw size={36} style={{ animation: 'spin 1s linear infinite', color: '#6366f1' }} />
-            <p style={{ fontWeight: 'semibold', color: '#475569', fontSize: '14px', margin: 0 }}>Processing and generating attendance reports...</p>
-            <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>Fetching large datasets, pivoting records and validating metrics</p>
-          </div>
-        ) : processedData.studentStats.length === 0 ? (
-          <div style={{ padding: '96px 0', textAlign: 'center', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', gap: '12px' }}>
-            <div style={{ width: '56px', height: '56px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
-              <FileText size={24} />
-            </div>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#475569', margin: '8px 0 0 0' }}>No Reports Generated Yet</h3>
-            <p style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '380px', margin: 0 }}>Select a course and class above, specify a date range, and click "Generate Report".</p>
-          </div>
-        ) : (
-          <div style={{ width: '100%', overflowX: 'auto' }}>
-            <table style={{ width: '100%', textAlign: 'left', fontSize: '12px', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>
-                  <th style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', borderRight: '1px solid #cbd5e1', position: 'sticky', left: 0, zIndex: 10 }}># Student</th>
-                  <th style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', borderRight: '1px solid #cbd5e1' }}>Email</th>
-
-                  {/* Dynamic Date Columns */}
-                  {processedData.uniqueDates.map(date => (
-                    <th key={date} style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', minWidth: '60px', borderRight: '1px solid #cbd5e1' }}>
-                      {formatDateLabel(date)}
-                    </th>
-                  ))}
-
-                  {/* Summary Metric Headers */}
-                  <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', borderLeft: '1px solid #cbd5e1', backgroundColor: '#ecfdf5', color: '#065f46' }}>P</th>
-                  <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', backgroundColor: '#fff1f2', color: '#9f1239' }}>A</th>
-                  <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', backgroundColor: '#eff6ff', color: '#1e40af' }}>Expected</th>
-                  <th style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', borderLeft: '1px solid #cbd5e1', color: '#1e293b' }}>Rate</th>
-                </tr>
-              </thead>
-              <tbody style={{ borderTop: 'none' }}>
-                {filteredStudentStats.length === 0 ? (
-                  <tr>
-                    <td colSpan={6 + processedData.uniqueDates.length} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
-                      No matching students found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStudentStats.map((student, idx) => (
-                    <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      {/* Student info sticky column */}
-                      <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#1e293b', borderBottom: '1px solid #f1f5f9', borderRight: '1px solid #cbd5e1', position: 'sticky', left: 0, backgroundColor: '#ffffff', zIndex: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '500', width: '16px' }}>{idx + 1}</span>
-                          <div>
-                            <div style={{ color: '#1e293b', fontWeight: 'bold' }}>{student.name}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Student Email */}
-                      <td style={{ padding: '12px 16px', color: '#64748b', borderBottom: '1px solid #f1f5f9', borderRight: '1px solid #cbd5e1' }}>
-                        {student.email}
-                      </td>
-
-                      {/* Dynamic Date Records */}
-                      {processedData.uniqueDates.map(date => {
-                        const rec = student.records[date];
-                        return (
-                          <td key={date} style={{ padding: '12px 8px', borderBottom: '1px solid #f1f5f9', borderRight: '1px solid #cbd5e1', textAlign: 'center' }}>
-                            {rec ? (
-                              <span
-                                title={`${student.name} - ${formatDateLabel(date)}: ${rec.status}`}
-                                style={getStatusStyles(rec.status)}
-                              >
-                                {statusShort[rec.status]}
-                              </span>
-                            ) : (
-                              <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>-</span>
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {/* Summarized Counts */}
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#059669', backgroundColor: 'rgba(236, 253, 245, 0.4)', borderBottom: '1px solid #f1f5f9', borderLeft: '1px solid #cbd5e1' }}>
-                        {student.present}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#e11d48', backgroundColor: 'rgba(255, 241, 242, 0.4)', borderBottom: '1px solid #f1f5f9' }}>
-                        {student.absent}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#1e40af', backgroundColor: 'rgba(239, 246, 255, 0.4)', borderBottom: '1px solid #f1f5f9' }}>
-                        {student.total}
-                      </td>
-
-                      {/* Attendance Percentage Indicator */}
-                      <td style={{ padding: '12px 16px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', borderLeft: '1px solid #cbd5e1', backgroundColor: '#f8fafc', position: 'sticky', right: 0, zIndex: 10 }}>
-                        <span style={getRateBadgeStyles(student.rate)}>
-                          {student.rate}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Guide/Legend Details Footer */}
+      {/* View Switcher Tabs */}
       {processedData.studentStats.length > 0 && (
         <div 
           className="no-print" 
           style={{
-            backgroundColor: '#f8fafc',
-            border: '1px solid #cbd5e1',
-            borderRadius: '12px',
-            padding: '16px',
             display: 'flex',
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: '16px',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '12px',
-            color: '#64748b',
-            fontWeight: '500'
+            borderBottom: '2px solid #cbd5e1',
+            marginTop: '8px',
+            marginBottom: '8px',
+            gap: '24px'
           }}
         >
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyStyle: 'center' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', border: '1px solid #d1fae5', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: 'bold' }}>P</span>
-              Present
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', border: '1px solid #ffe4e6', backgroundColor: '#fff1f2', color: '#e11d48', fontSize: '10px', fontWeight: 'bold' }}>A</span>
-              Absent
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontWeight: 'bold', color: '#cbd5e1' }}>-</span>
-              No session / No record
-            </span>
+          <button
+            onClick={() => setActiveTab('matrix')}
+            style={{
+              padding: '12px 8px',
+              fontSize: '14px',
+              fontWeight: '700',
+              color: activeTab === 'matrix' ? '#064f7c' : '#64748b',
+              borderBottom: activeTab === 'matrix' ? '3px solid #064f7c' : '3px solid transparent',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              marginBottom: '-2px'
+            }}
+          >
+            Detailed Matrix Table
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            style={{
+              padding: '12px 8px',
+              fontSize: '14px',
+              fontWeight: '700',
+              color: activeTab === 'analytics' ? '#064f7c' : '#64748b',
+              borderBottom: activeTab === 'analytics' ? '3px solid #064f7c' : '3px solid transparent',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              marginBottom: '-2px'
+            }}
+          >
+            Analytics & Trend Visualization
+          </button>
+        </div>
+      )}
+
+      {/* Tab Content 1: Detailed Matrix View */}
+      {processedData.studentStats.length > 0 && activeTab === 'matrix' && (
+        <>
+          <div 
+            className="print-full-width" 
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Table Controls (Search & Export) */}
+            {processedData.studentStats.length > 0 && (
+              <div 
+                className="no-print" 
+                style={{
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #cbd5e1',
+                  display: 'flex',
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(248, 250, 252, 0.5)'
+                }}
+              >
+                {/* Student Search */}
+                <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    placeholder="Search students..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '36px', paddingRight: '16px', paddingTop: '8px', paddingBottom: '8px', fontSize: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', outline: 'none' }}
+                  />
+                </div>
+
+                {/* Export & Print */}
+                <div style={{ display: 'flex', gap: '8px', width: 'auto' }}>
+                  <button
+                    onClick={exportToCSV}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontWeight: '600', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}
+                  >
+                    <Download size={14} />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={downloadPDF}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#1e293b', color: '#ffffff', fontWeight: '600', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                  >
+                    <FileText size={14} />
+                    Save PDF Report
+                  </button>
+                  {!isStudent && reportType === 'monthly' && (
+                    <button
+                      onClick={triggerLowAttendanceAlerts}
+                      disabled={sendingAlerts}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        backgroundColor: '#fff5f5',
+                        color: '#c53030',
+                        border: '1px solid #feb2b2',
+                        fontWeight: '600',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        cursor: sendingAlerts ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!sendingAlerts) {
+                          e.currentTarget.style.backgroundColor = '#fed7d7';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!sendingAlerts) {
+                          e.currentTarget.style.backgroundColor = '#fff5f5';
+                        }
+                      }}
+                    >
+                      <Mail size={14} style={{ color: '#c53030' }} />
+                      {sendingAlerts ? 'Sending Alerts...' : 'Alert Low Attendance'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* The Grid / Table Wrapper */}
+            {loading ? (
+              <div style={{ padding: '96px 0', textAlign: 'center', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                <RefreshCw size={36} style={{ animation: 'spin 1s linear infinite', color: '#6366f1' }} />
+                <p style={{ fontWeight: 'semibold', color: '#475569', fontSize: '14px', margin: 0 }}>Processing and generating attendance reports...</p>
+                <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>Fetching large datasets, pivoting records and validating metrics</p>
+              </div>
+            ) : processedData.studentStats.length === 0 ? (
+              <div style={{ padding: '96px 0', textAlign: 'center', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', gap: '12px' }}>
+                <div style={{ width: '56px', height: '56px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyStyle: 'center', color: '#94a3b8', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <FileText size={24} />
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#475569', margin: '8px 0 0 0' }}>No Reports Generated Yet</h3>
+                <p style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '380px', margin: 0 }}>Select a course and class above, specify a date range, and click "Generate Report".</p>
+              </div>
+            ) : (
+              <div style={{ width: '100%', overflowX: 'auto' }}>
+                <table style={{ width: '100%', textAlign: 'left', fontSize: '12px', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>
+                      <th style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', borderRight: '1px solid #cbd5e1', position: 'sticky', left: 0, zIndex: 10 }}># Student</th>
+                      <th style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', borderRight: '1px solid #cbd5e1' }}>Email</th>
+
+                      {/* Dynamic Date Columns */}
+                      {processedData.uniqueDates.map(date => (
+                        <th key={date} style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', minWidth: '60px', borderRight: '1px solid #cbd5e1' }}>
+                          {formatDateLabel(date)}
+                        </th>
+                      ))}
+
+                      {/* Summary Metric Headers */}
+                      <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', borderLeft: '1px solid #cbd5e1', backgroundColor: '#ecfdf5', color: '#065f46' }}>P</th>
+                      <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', backgroundColor: '#fff1f2', color: '#9f1239' }}>A</th>
+                      <th style={{ padding: '12px 16px', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', backgroundColor: '#eff6ff', color: '#1e40af' }}>Expected</th>
+                      <th style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontWeight: 'bold', fontSize: '10px', textAlign: 'center', borderLeft: '1px solid #cbd5e1', color: '#1e293b' }}>Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody style={{ borderTop: 'none' }}>
+                    {filteredStudentStats.length === 0 ? (
+                      <tr>
+                        <td colSpan={6 + processedData.uniqueDates.length} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
+                          No matching students found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredStudentStats.map((student, idx) => (
+                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          {/* Student info sticky column */}
+                          <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#1e293b', borderBottom: '1px solid #f1f5f9', borderRight: '1px solid #cbd5e1', position: 'sticky', left: 0, backgroundColor: '#ffffff', zIndex: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '500', width: '16px' }}>{idx + 1}</span>
+                              <div>
+                                <div style={{ color: '#1e293b', fontWeight: 'bold' }}>{student.name}</div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Student Email */}
+                          <td style={{ padding: '12px 16px', color: '#64748b', borderBottom: '1px solid #f1f5f9', borderRight: '1px solid #cbd5e1' }}>
+                            {student.email}
+                          </td>
+
+                          {/* Dynamic Date Records */}
+                          {processedData.uniqueDates.map(date => {
+                            const rec = student.records[date];
+                            return (
+                              <td key={date} style={{ padding: '12px 8px', borderBottom: '1px solid #f1f5f9', borderRight: '1px solid #cbd5e1', textAlign: 'center' }}>
+                                {rec ? (
+                                  <span
+                                    title={`${student.name} - ${formatDateLabel(date)}: ${rec.status}`}
+                                    style={getStatusStyles(rec.status)}
+                                  >
+                                    {statusShort[rec.status]}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+
+                          {/* Summarized Counts */}
+                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#059669', backgroundColor: 'rgba(236, 253, 245, 0.4)', borderBottom: '1px solid #f1f5f9', borderLeft: '1px solid #cbd5e1' }}>
+                            {student.present}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#e11d48', backgroundColor: 'rgba(255, 241, 242, 0.4)', borderBottom: '1px solid #f1f5f9' }}>
+                            {student.absent}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#1e40af', backgroundColor: 'rgba(239, 246, 255, 0.4)', borderBottom: '1px solid #f1f5f9' }}>
+                            {student.total}
+                          </td>
+
+                          {/* Attendance Percentage Indicator */}
+                          <td style={{ padding: '12px 16px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', borderLeft: '1px solid #cbd5e1', backgroundColor: '#f8fafc', position: 'sticky', right: 0, zIndex: 10 }}>
+                            <span style={getRateBadgeStyles(student.rate)}>
+                              {student.rate}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          <div style={{ color: '#94a3b8', textAlign: 'right' }}>
-            Shows attendance matrix grouped by student and chronological dates.
+          {/* Guide/Legend Details Footer */}
+          {processedData.studentStats.length > 0 && (
+            <div 
+              className="no-print" 
+              style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                borderRadius: '12px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: '16px',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '12px',
+                color: '#64748b',
+                fontWeight: '500'
+              }}
+            >
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyStyle: 'center' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', border: '1px solid #d1fae5', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: 'bold' }}>P</span>
+                  Present
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', border: '1px solid #ffe4e6', backgroundColor: '#fff1f2', color: '#e11d48', fontSize: '10px', fontWeight: 'bold' }}>A</span>
+                  Absent
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontWeight: 'bold', color: '#cbd5e1' }}>-</span>
+                  No session / No record
+                </span>
+              </div>
+
+              <div style={{ color: '#94a3b8', textAlign: 'right' }}>
+                Shows attendance matrix grouped by student and chronological dates.
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Tab Content 2: Analytics Dashboard View */}
+      {processedData.studentStats.length > 0 && activeTab === 'analytics' && (
+        <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* Top Row: Donut + Weekday Bar charts */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+            
+            {/* Donut distribution */}
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#475569', margin: 0 }}>Attendance Status Distribution</h3>
+              
+              {donutData.total === 0 ? (
+                <div style={{ padding: '40px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>No records to display.</div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-around', gap: '20px', marginTop: '10px' }}>
+                  
+                  {/* SVG Circle Donut */}
+                  <div style={{ position: 'relative', width: '130px', height: '130px', display: 'flex', alignItems: 'center', justifyStyle: 'center' }}>
+                    <svg width="130" height="130" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" strokeWidth="10" />
+                      
+                      {donutData.presentPct > 0 && (
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="transparent"
+                          stroke="#10b981"
+                          strokeWidth="10"
+                          strokeDasharray={`${(donutData.presentPct / 100) * 251.327} 251.327`}
+                          strokeDashoffset="0"
+                          style={{ transition: 'all 0.3s ease', cursor: 'pointer' }}
+                          onMouseEnter={() => setHoveredSlice('PRESENT')}
+                          onMouseLeave={() => setHoveredSlice(null)}
+                        />
+                      )}
+                      
+                      {donutData.latePct > 0 && (
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="transparent"
+                          stroke="#f59e0b"
+                          strokeWidth="10"
+                          strokeDasharray={`${(donutData.latePct / 100) * 251.327} 251.327`}
+                          strokeDashoffset={-((donutData.presentPct / 100) * 251.327)}
+                          style={{ transition: 'all 0.3s ease', cursor: 'pointer' }}
+                          onMouseEnter={() => setHoveredSlice('LATE')}
+                          onMouseLeave={() => setHoveredSlice(null)}
+                        />
+                      )}
+                      
+                      {donutData.absentPct > 0 && (
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="transparent"
+                          stroke="#ef4444"
+                          strokeWidth="10"
+                          strokeDasharray={`${(donutData.absentPct / 100) * 251.327} 251.327`}
+                          strokeDashoffset={-(((donutData.presentPct + donutData.latePct) / 100) * 251.327)}
+                          style={{ transition: 'all 0.3s ease', cursor: 'pointer' }}
+                          onMouseEnter={() => setHoveredSlice('ABSENT')}
+                          onMouseLeave={() => setHoveredSlice(null)}
+                        />
+                      )}
+                    </svg>
+                    
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <span style={{ fontSize: '20px', fontWeight: '800', color: hoveredSlice === 'PRESENT' ? '#10b981' : hoveredSlice === 'LATE' ? '#f59e0b' : hoveredSlice === 'ABSENT' ? '#ef4444' : '#1e293b', transition: 'color 0.2s' }}>
+                        {hoveredSlice === 'PRESENT' ? `${Math.round(donutData.presentPct)}%` : hoveredSlice === 'LATE' ? `${Math.round(donutData.latePct)}%` : hoveredSlice === 'ABSENT' ? `${Math.round(donutData.absentPct)}%` : `${overviewStats.avgRate}%`}
+                      </span>
+                      <span style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                        {hoveredSlice === 'PRESENT' ? 'Present' : hoveredSlice === 'LATE' ? 'Late' : hoveredSlice === 'ABSENT' ? 'Absent' : 'Avg Rate'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Legend list items */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div 
+                      onMouseEnter={() => setHoveredSlice('PRESENT')}
+                      onMouseLeave={() => setHoveredSlice(null)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', backgroundColor: hoveredSlice === 'PRESENT' ? '#ecfdf5' : 'transparent', transition: 'all 0.15s' }}
+                    >
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Present ({donutData.present})</span>
+                        <span style={{ fontSize: '10px', color: '#64748b' }}>{Math.round(donutData.presentPct)}% of total</span>
+                      </div>
+                    </div>
+                    <div 
+                      onMouseEnter={() => setHoveredSlice('LATE')}
+                      onMouseLeave={() => setHoveredSlice(null)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', backgroundColor: hoveredSlice === 'LATE' ? '#fffbeb' : 'transparent', transition: 'all 0.15s' }}
+                    >
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Late ({donutData.late})</span>
+                        <span style={{ fontSize: '10px', color: '#64748b' }}>{Math.round(donutData.latePct)}% of total</span>
+                      </div>
+                    </div>
+                    <div 
+                      onMouseEnter={() => setHoveredSlice('ABSENT')}
+                      onMouseLeave={() => setHoveredSlice(null)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', backgroundColor: hoveredSlice === 'ABSENT' ? '#fff1f2' : 'transparent', transition: 'all 0.15s' }}
+                    >
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Absent ({donutData.absent})</span>
+                        <span style={{ fontSize: '10px', color: '#64748b' }}>{Math.round(donutData.absentPct)}% of total</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Weekday profile bar chart */}
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#475569', margin: 0 }}>Attendance by Weekday</h3>
+                <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                  Threshold (75%)
+                </span>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '140px', paddingBottom: '8px', borderBottom: '1px solid #cbd5e1', position: 'relative', marginTop: '10px' }}>
+                {/* 75% critical limit indicator line */}
+                <div style={{ position: 'absolute', bottom: '75%', left: 0, right: 0, borderBottom: '1px dashed #fca5a5', zIndex: 1, pointerEvents: 'none' }} />
+                
+                {dayOfWeekData.map((day, idx) => {
+                  const isLow = day.rate < 75;
+                  const barGradient = isLow 
+                    ? 'linear-gradient(to top, #be123c, #ef4444)' 
+                    : 'linear-gradient(to top, #064f7c, #00d2ff)';
+                  return (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative' }} className="group">
+                      <div 
+                        style={{ 
+                          width: '22px', 
+                          background: barGradient, 
+                          borderRadius: '6px 6px 0 0', 
+                          height: `${Math.max(4, day.rate)}%`, 
+                          transition: 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                          cursor: 'pointer',
+                          zIndex: 2,
+                          position: 'relative'
+                        }} 
+                        className="hover:brightness-110"
+                      >
+                        {/* Tooltip on hover */}
+                        <div 
+                          style={{ 
+                            position: 'absolute', 
+                            bottom: '100%', 
+                            left: '50%', 
+                            transform: 'translateX(-50%)', 
+                            marginBottom: '8px',
+                            backgroundColor: '#0f172a', 
+                            color: '#ffffff', 
+                            padding: '4px 8px', 
+                            borderRadius: '6px', 
+                            fontSize: '9px', 
+                            fontWeight: 'bold',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                            pointerEvents: 'none',
+                            whiteSpace: 'nowrap',
+                            zIndex: 20
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        >
+                          {day.rate}% ({day.total} records)
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', marginTop: '8px' }}>
+                        {day.name.substring(0, 3)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Row: Trend Line chart */}
+          <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#475569', margin: 0 }}>Attendance Rate Trend Over Time</h3>
+            
+            {trendData.length < 2 ? (
+              <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                Not enough chronologically ordered points to display a trend line. Try broadening your date filter range.
+              </div>
+            ) : (
+              <div style={{ width: '100%', overflowX: 'auto', position: 'relative' }}>
+                <svg width="100%" height="220" viewBox="0 0 600 220" style={{ overflow: 'visible', minWidth: '500px' }}>
+                  <defs>
+                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#00d2ff" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="#064f7c" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Grid Lines & Y labels */}
+                  {[0, 25, 50, 75, 100].map(lvl => {
+                    const y = 20 + (1 - lvl / 100) * 170;
+                    return (
+                      <g key={lvl}>
+                        <line x1="45" y1={y} x2="580" y2={y} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4" />
+                        <text x="35" y={y + 3} fill="#64748b" fontSize="9" fontWeight="bold" textAnchor="end">{lvl}%</text>
+                      </g>
+                    );
+                  })}
+                  
+                  {/* Plot calculations */}
+                  {(() => {
+                    const plotWidth = 535; // 580 - 45
+                    const plotHeight = 170; // 190 - 20
+                    const points = trendData.map((d, i) => {
+                      const x = 45 + (i / (trendData.length - 1)) * plotWidth;
+                      const y = 20 + (1 - d.rate / 100) * plotHeight;
+                      return { x, y, ...d, index: i };
+                    });
+                    
+                    const lineD = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                    const areaD = `${lineD} L ${points[points.length - 1].x} 190 L ${points[0].x} 190 Z`;
+                    
+                    return (
+                      <>
+                        <path d={areaD} fill="url(#areaGrad)" />
+                        
+                        <path d={lineD} fill="none" stroke="#064f7c" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        
+                        {hoveredPoint !== null && points[hoveredPoint] && (
+                          <line 
+                            x1={points[hoveredPoint].x} 
+                            y1="20" 
+                            x2={points[hoveredPoint].x} 
+                            y2="190" 
+                            stroke="#94a3b8" 
+                            strokeWidth="1.5" 
+                            strokeDasharray="2 2" 
+                          />
+                        )}
+                        
+                        {points.map((p, idx) => (
+                          <circle
+                            key={idx}
+                            cx={p.x}
+                            cy={p.y}
+                            r={hoveredPoint === idx ? '6' : '4'}
+                            fill={hoveredPoint === idx ? '#00d2ff' : '#064f7c'}
+                            stroke="#ffffff"
+                            strokeWidth="2"
+                            style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
+                            onMouseEnter={() => setHoveredPoint(idx)}
+                            onMouseLeave={() => setHoveredPoint(null)}
+                          />
+                        ))}
+                        
+                        {points.map((p, idx) => (
+                          <circle
+                            key={`hit-${idx}`}
+                            cx={p.x}
+                            cy={p.y}
+                            r="15"
+                            fill="transparent"
+                            style={{ cursor: 'pointer' }}
+                            onMouseEnter={() => setHoveredPoint(idx)}
+                            onMouseLeave={() => setHoveredPoint(null)}
+                          />
+                        ))}
+                        
+                        {hoveredPoint !== null && points[hoveredPoint] && (
+                          <g transform={`translate(${
+                            points[hoveredPoint].x > 450 
+                              ? points[hoveredPoint].x - 125 
+                              : points[hoveredPoint].x + 15
+                          }, ${
+                            points[hoveredPoint].y > 150 
+                              ? points[hoveredPoint].y - 55 
+                              : points[hoveredPoint].y + 10
+                          })`}>
+                            <rect width="115" height="42" rx="6" fill="#0f172a" opacity="0.95" />
+                            <text x="10" y="16" fill="#94a3b8" fontSize="9" fontWeight="bold">
+                              {formatDateLabel(points[hoveredPoint].date)}
+                            </text>
+                            <text x="10" y="32" fill="#ffffff" fontSize="11" fontWeight="bold">
+                              Class Rate: {points[hoveredPoint].rate}%
+                            </text>
+                          </g>
+                        )}
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Row: Risk Profiler / Direct Actions */}
+          <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#475569', margin: 0 }}>Attendance Risk Profile</h3>
+            
+            {isStudent ? (
+              /* Student view cards */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {processedData.studentStats.map(student => {
+                  let statusTitle = 'Excellent Standing';
+                  let statusDesc = 'Wonderful! You are maintaining an excellent attendance rate (>=90%). Keep attending your lectures consistently to secure your progress!';
+                  let statusColor = '#065f46';
+                  let statusBg = '#d1fae5';
+                  let borderCol = '#a7f3d0';
+
+                  if (student.rate < 75) {
+                    statusTitle = 'At Academic Risk';
+                    statusDesc = 'Attention: Your attendance has fallen below the mandatory 75% requirement. Please review your logs, attend upcoming classes, and contact your instructor immediately.';
+                    statusColor = '#9f1239';
+                    statusBg = '#ffe4e6';
+                    borderCol = '#fecaca';
+                  } else if (student.rate < 90) {
+                    statusTitle = 'Average Standing';
+                    statusDesc = 'Good job! You are currently meeting basic academic expectations. Try attending a few more classes to boost your rate into the excellent range (>=90%).';
+                    statusColor = '#92400e';
+                    statusBg = '#fef3c7';
+                    borderCol = '#fde68a';
+                  }
+
+                  return (
+                    <div key={student.id} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ border: `1px solid ${borderCol}`, backgroundColor: statusBg, color: statusColor, padding: '16px', borderRadius: '12px', fontSize: '13px', lineHeight: '1.5' }}>
+                        <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>{statusTitle}</strong>
+                        {statusDesc}
+                      </div>
+
+                      <div style={{ border: '1px solid #cbd5e1', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>Your attendance rate:</span>
+                          <span style={{ fontSize: '18px', fontWeight: '800', color: statusColor }}>{student.rate}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                          <div style={{ width: `${student.rate}%`, height: '100%', backgroundColor: student.rate < 75 ? '#ef4444' : student.rate < 90 ? '#f59e0b' : '#10b981', borderRadius: '9999px' }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', fontWeight: '500' }}>
+                          <span>{student.present} Present &bull; {student.late} Late</span>
+                          <span>{student.absent} Absent &bull; {student.total} Expected Classes</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Teacher/Admin view panels */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  
+                  {/* Excellent box */}
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '12px', backgroundColor: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#64748b' }}>
+                      <span>EXCELLENT</span>
+                      <span style={{ color: '#10b981' }}>{riskSegmentation.excellent.length} students</span>
+                    </div>
+                    <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '9999px', marginTop: '8px', overflow: 'hidden' }}>
+                      <div style={{ width: `${(riskSegmentation.excellent.length / Math.max(1, processedData.studentStats.length)) * 100}%`, height: '100%', backgroundColor: '#10b981', borderRadius: '9999px' }} />
+                    </div>
+                  </div>
+
+                  {/* Average box */}
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '12px', backgroundColor: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#64748b' }}>
+                      <span>AVERAGE (75-90%)</span>
+                      <span style={{ color: '#f59e0b' }}>{riskSegmentation.average.length} students</span>
+                    </div>
+                    <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '9999px', marginTop: '8px', overflow: 'hidden' }}>
+                      <div style={{ width: `${(riskSegmentation.average.length / Math.max(1, processedData.studentStats.length)) * 100}%`, height: '100%', backgroundColor: '#f59e0b', borderRadius: '9999px' }} />
+                    </div>
+                  </div>
+
+                  {/* At Risk box */}
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '12px', backgroundColor: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#64748b' }}>
+                      <span>AT RISK</span>
+                      <span style={{ color: '#ef4444' }}>{riskSegmentation.atRisk.length} students</span>
+                    </div>
+                    <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '9999px', marginTop: '8px', overflow: 'hidden' }}>
+                      <div style={{ width: `${(riskSegmentation.atRisk.length / Math.max(1, processedData.studentStats.length)) * 100}%`, height: '100%', backgroundColor: '#ef4444', borderRadius: '9999px' }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Risk list warnings */}
+                <div>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Students Below 75% Attendance ({riskSegmentation.atRisk.length})
+                  </h4>
+                  {riskSegmentation.atRisk.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', border: '1px dashed #cbd5e1', borderRadius: '12px', color: '#10b981', backgroundColor: '#ecfdf5', fontWeight: '600', fontSize: '13px' }}>
+                      🎉 Excellent! All enrolled students have kept their attendance rate above the critical limit.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {riskSegmentation.atRisk.map(student => (
+                        <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #ffe4e6', backgroundColor: '#fff5f5', borderRadius: '10px', padding: '10px 14px', gap: '16px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ fontSize: '13px', color: '#9f1239', display: 'block' }}>{student.name}</strong>
+                            <span style={{ fontSize: '11px', color: '#b91c1c', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{student.email}</span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#ef4444' }}>{student.rate}%</span>
+                            <button
+                              onClick={() => alertAtRiskStudent(student)}
+                              disabled={emailLoadingMap[student.id]}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#e11d48',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '6px 10px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: emailLoadingMap[student.id] ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                transition: 'background-color 0.2s',
+                                whiteSpace: 'nowrap'
+                              }}
+                              onMouseOver={(e) => { if (!emailLoadingMap[student.id]) e.currentTarget.style.backgroundColor = '#be123c'; }}
+                              onMouseOut={(e) => { if (!emailLoadingMap[student.id]) e.currentTarget.style.backgroundColor = '#e11d48'; }}
+                            >
+                              <Mail size={12} style={{ marginRight: '4px' }} />
+                              {emailLoadingMap[student.id] ? 'Alerting...' : 'Alert Student'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

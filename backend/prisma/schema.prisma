@@ -68,18 +68,19 @@ model Enrollment {
 }
 
 model Attendance {
-  id        Int              @id @default(autoincrement())
-  studentId Int
-  courseId  Int
-  date      DateTime         @default(now())
-  markedAt  DateTime         @default(now())
-  status    AttendanceStatus @default(PRESENT)
-  location  String?
-  notes     String?
-  latitude  Float?
-  longitude Float?
-  course    Course           @relation(fields: [courseId], references: [id])
-  student   User             @relation(fields: [studentId], references: [id])
+  id           Int              @id @default(autoincrement())
+  studentId    Int
+  courseId     Int
+  date         DateTime         @default(now())
+  markedAt     DateTime         @default(now())
+  status       AttendanceStatus @default(PRESENT)
+  markedByRole String?          // 'STUDENT' | 'TEACHER' | 'ADMIN' — tracks who last set the status
+  location     String?
+  notes        String?
+  latitude     Float?
+  longitude    Float?
+  course       Course           @relation(fields: [courseId], references: [id])
+  student      User             @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, courseId, date])
 }

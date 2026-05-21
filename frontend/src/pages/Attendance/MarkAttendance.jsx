@@ -98,8 +98,26 @@ const MarkAttendance = () => {
     error: null,
   });
   const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const isStudentRole = loggedInUser?.role === 'STUDENT';
+  const userRole = loggedInUser?.role || 'STUDENT';
+  const isStudentRole = userRole === 'STUDENT';
  
+  const isLockedForCurrentUser = (record) => {
+    if (!record.alreadySaved) return false;
+    if (userRole === 'STUDENT' && (record.markedByRole === 'TEACHER' || record.markedByRole === 'ADMIN')) {
+      return true;
+    }
+    if (userRole === 'TEACHER' && record.markedByRole === 'ADMIN') {
+      return true;
+    }
+    return false;
+  };
+
+  const canModifyRecord = (record) => {
+    if (isLockedForCurrentUser(record)) return false;
+    const isGraceOver = isStudentRole && courseDetails?.time && isGracePeriodOver(courseDetails.time, date);
+    return !isGraceOver;
+  };
+
   // Automatically detect location
   const detectLocation = async () => {
     setResolvedLocation(prev => ({ ...prev, loading: true, error: null, source: 'PENDING' }));
@@ -192,6 +210,7 @@ const MarkAttendance = () => {
             email: student.email,
             status: defaultStatus,
             alreadySaved: !!existing,
+            markedByRole: existing ? existing.markedByRole : null,
           };
         });
         setRecords(mergedRecords);
@@ -259,6 +278,7 @@ const MarkAttendance = () => {
               email: student.email,
               status: defaultStatus,
               alreadySaved: !!existing,
+              markedByRole: existing ? existing.markedByRole : null,
             };
           })
           : attendanceList.map((record) => ({
@@ -267,6 +287,7 @@ const MarkAttendance = () => {
             email: record.student?.email || 'Unknown Email',
             status: record.status,
             alreadySaved: true,
+            markedByRole: record.markedByRole || null,
           }));
 
         setCourseDetails(courseInfo);
@@ -317,7 +338,7 @@ const MarkAttendance = () => {
   };
 
   const markAll = (status) => {
-    setRecords(prev => prev.map(r => ({ ...r, status })));
+    setRecords(prev => prev.map(r => canModifyRecord(r) ? { ...r, status } : r));
   };
 
   const showToast = (type, message) => {
@@ -326,10 +347,15 @@ const MarkAttendance = () => {
   };
 
   const handleSave = async () => {
-    if (!selectedCourse || records.length === 0) return;
+    console.log('[ATTENDANCE] handleSave triggered. selectedCourse:', selectedCourse, 'records:', JSON.stringify(records, null, 2));
+    if (!selectedCourse || records.length === 0) {
+      console.warn('[ATTENDANCE] Save aborted: no course selected or records list is empty.');
+      return;
+    }
 
     // Don't allow saving if PENDING
     if (isStudentRole && records[0].status === 'PENDING') {
+      console.warn('[ATTENDANCE] Save aborted: Student attendance is in PENDING state.');
       showToast('error', 'Please choose Present or Absent before saving.');
       return;
     }
@@ -337,33 +363,56 @@ const MarkAttendance = () => {
     setSaving(true);
 
     try {
-      console.log('[ATTENDANCE] Starting attendance save with resolved location...');
-      
       const { latitude, longitude, locationName } = resolvedLocation;
-      console.log('[ATTENDANCE] Payload Location - Lat:', latitude, 'Lon:', longitude, 'Name:', locationName);
-      
-      // Step 3: Send attendance with location
-      console.log('[ATTENDANCE] Sending attendance records with location...');
-      
-      const result = await api.bulkMarkAttendance({
-        courseId: parseInt(selectedCourse),
-        date,
-        records: records.map((r) => ({ 
+      console.log('[ATTENDANCE] Resolved location for payload:', { latitude, longitude, locationName });
+
+      const recordsToSave = records
+        .filter((r) => r.status && r.status !== 'PENDING' && !isLockedForCurrentUser(r))
+        .map((r) => ({ 
           studentId: r.studentId, 
           status: r.status,
           location: locationName || 'Unknown Location',
           latitude: latitude || null,
           longitude: longitude || null,
-        })),
-      });
-      
-      console.log('[ATTENDANCE] SUCCESS - Response:', result);
-      showToast('success', `${result.saved} record(s) saved with location.`);
-      setRecords(prev => prev.map(r => ({ ...r, alreadySaved: true })));
+        }));
+
+      const pendingCount = records.filter((r) => r.status === 'PENDING').length;
+      const lockedCount = records.filter((r) => isLockedForCurrentUser(r)).length;
+      if (recordsToSave.length === 0) {
+        const suffix = lockedCount > 0
+          ? ' Locked records cannot be changed.'
+          : ' Please choose Present or Absent for at least one record before saving.';
+        showToast('error', `No unlocked attendance records available to save.${suffix}`);
+        setSaving(false);
+        return;
+      }
+
+      const payload = {
+        courseId: parseInt(selectedCourse),
+        date,
+        records: recordsToSave,
+      };
+
+      console.log('[ATTENDANCE] Sending payload to api.bulkMarkAttendance:', JSON.stringify(payload, null, 2));
+
+      const result = await api.bulkMarkAttendance(payload);
+      console.log('[ATTENDANCE] bulkMarkAttendance response:', result);
+
+      if (result.errors && result.errors.length > 0) {
+        console.error('[ATTENDANCE] Backend returned validation/lock errors:', result.errors);
+        const errorDetails = result.errors.map(e => `Student ${e.studentId}: ${e.reason}`).join('; ');
+        showToast('error', `Some records could not be saved: ${errorDetails}`);
+      } else {
+        const totalSaved = result.saved;
+        const suffix = [];
+        if (pendingCount > 0) suffix.push(`${pendingCount} pending record(s) were skipped`);
+        if (lockedCount > 0) suffix.push(`${lockedCount} locked record(s) were left unchanged`);
+        showToast('success', `${totalSaved} record(s) saved.${suffix.length ? ' ' + suffix.join('. ') + '.' : ''}`);
+        setRecords(prev => prev.map(r => ({ ...r, alreadySaved: r.status !== 'PENDING' ? true : r.alreadySaved })));
+      }
     } catch (err) {
-      console.error('[ATTENDANCE] ERROR:', err);
-      console.error('[ATTENDANCE] Error Message:', err.message);
-      showToast('error', err.message || 'Failed to save attendance.');
+      console.error('[ATTENDANCE] API critical save error:', err);
+      showToast('error', err.message || 'Failed to save attendance due to server/network error.');
     } finally {
       setSaving(false);
     }
@@ -611,28 +660,47 @@ const MarkAttendance = () => {
                     <td className="px-5 py-3.5 font-semibold text-slate-800">{r.name}</td>
                     <td className="px-5 py-3.5 text-slate-500">{r.email}</td>
                     <td className="px-5 py-3.5">
-                      <div className="flex gap-2">
-                        {STATUS_OPTIONS.map(s => {
-                          const isSelected = r.status === s;
-                          const isDisabled = isStudentRole && (r.alreadySaved || (courseDetails?.time && isGracePeriodOver(courseDetails.time, date)));
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex gap-2">
+                          {STATUS_OPTIONS.map(s => {
+                            const isSelected = r.status === s;
+                            const isLockedForRole = isLockedForCurrentUser(r);
+                            const isGraceOver = isStudentRole && courseDetails?.time && isGracePeriodOver(courseDetails.time, date);
+                            const isDisabled = isLockedForRole || isGraceOver;
 
-                          return (
-                            <button
-                              key={s}
-                              disabled={isDisabled}
-                              onClick={() => setStatus(r.studentId, s)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all
-                                ${isSelected
-                                  ? `${statusStyle[s]} shadow-sm`
-                                  : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 disabled:hover:border-slate-200'
-                                }
-                                ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'active:scale-95'}`}
-                            >
-                              {isSelected && statusIcon[s]}
-                              {s === 'PRESENT' ? 'Present' : 'Absent'}
-                            </button>
-                          );
-                        })}
+                            return (
+                              <button
+                                key={s}
+                                disabled={isDisabled}
+                                onClick={() => setStatus(r.studentId, s)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all
+                                  ${isSelected
+                                    ? `${statusStyle[s]} shadow-sm`
+                                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 disabled:hover:border-slate-200'
+                                  }
+                                  ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'active:scale-95'}`}
+                              >
+                                {isSelected && statusIcon[s]}
+                                {s === 'PRESENT' ? 'Present' : 'Absent'}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Premium "Updated by {role}" badge */}
+                        {r.markedByRole && (
+                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-300 shadow-sm ${
+                            r.markedByRole === 'ADMIN' 
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200/60 shadow-indigo-100/40' 
+                              : r.markedByRole === 'TEACHER' 
+                                ? 'bg-amber-50 text-amber-700 border-amber-200/60 shadow-amber-100/40' 
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200/60 shadow-emerald-100/40'
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${
+                              r.markedByRole === 'ADMIN' ? 'bg-indigo-500' : r.markedByRole === 'TEACHER' ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`} />
+                            Updated by {r.markedByRole === 'ADMIN' ? 'Admin' : r.markedByRole === 'TEACHER' ? 'Teacher' : 'Student'}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -643,14 +711,23 @@ const MarkAttendance = () => {
 
           {/* Save Button */}
           <div className="flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={saving || (isStudentRole && (records[0]?.alreadySaved || (courseDetails?.time && isGracePeriodOver(courseDetails.time, date))))}
-              className="flex items-center gap-2 bg-brand-dark text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-brand-hover active:scale-[0.98] transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Save size={16} />
-              {saving ? 'Saving...' : 'Save Attendance'}
-            </button>
+            {(() => {
+              const isLockedForSave = records.every(r => {
+                const isLockedForThisRow = isLockedForCurrentUser(r);
+                const isGraceOverForThisRow = isStudentRole && courseDetails?.time && isGracePeriodOver(courseDetails.time, date);
+                return isLockedForThisRow || isGraceOverForThisRow;
+              });
+              return (
+                <button
+                  onClick={handleSave}
+                  disabled={saving || isLockedForSave}
+                  className="flex items-center gap-2 bg-brand-dark text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-brand-hover active:scale-[0.98] transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Save size={16} />
+                  {saving ? 'Saving...' : 'Save Attendance'}
+                </button>
+              );
+            })()}
           </div>
         </>
       )}
