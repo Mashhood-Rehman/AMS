@@ -3,20 +3,83 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: 'mashhoodrehman99@gmail.com',
-    pass: process.env.EMAIL_APP_PASSWORD,
-  },
-});
+const EMAIL_FROM =
+  process.env.EMAIL_FROM || '"AMS Attendance System" <onboarding@resend.dev>';
+
+const resendApiKey = process.env.RESEND_API_KEY;
+
+let smtpTransporter;
+function getSmtpTransporter() {
+  if (smtpTransporter) return smtpTransporter;
+
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.EMAIL_APP_PASSWORD;
+
+  if (!user || !pass) {
+    return null;
+  }
+
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure = process.env.SMTP_SECURE !== 'false';
+
+  smtpTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port,
+    secure,
+    auth: { user, pass },
+    connectionTimeout: 15000,
+    ...(process.env.SMTP_FORCE_IPV4 === 'true' && { family: 4 }),
+  });
+
+  return smtpTransporter;
+}
+
+async function sendEmail({ to, subject, html }) {
+  if (resendApiKey) {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: [to],
+        subject,
+        html,
+      }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const message =
+        body?.message || body?.error || `Resend API error (${response.status})`;
+      throw new Error(message);
+    }
+
+    return { success: true, id: body.id };
+  }
+
+  const transporter = getSmtpTransporter();
+  if (!transporter) {
+    throw new Error(
+      'Email is not configured. Set RESEND_API_KEY on Render (recommended) or SMTP_USER/SMTP_PASS for local SMTP.',
+    );
+  }
+
+  await transporter.sendMail({
+    from: EMAIL_FROM,
+    to,
+    subject,
+    html,
+  });
+
+  return { success: true };
+}
 
 export const sendResetEmail = async (email, resetLink) => {
-  const mailOptions = {
-    from: '"AMS Attendance System" <mashhoodrehman99@gmail.com>',
-    to: email,
-    subject: 'Password Reset Request - AMS',
-    html: `
+  const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -89,11 +152,14 @@ export const sendResetEmail = async (email, resetLink) => {
         </div>
       </body>
       </html>
-    `,
-  };
+    `;
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendEmail({
+      to: email,
+      subject: 'Password Reset Request - AMS',
+      html,
+    });
     return { success: true };
   } catch (error) {
     console.error('Error sending email:', error);
@@ -102,11 +168,7 @@ export const sendResetEmail = async (email, resetLink) => {
 };
 
 export const sendLowAttendanceEmail = async (email, studentName, attendanceRate, monthName, courseName = '') => {
-  const mailOptions = {
-    from: '"AMS Attendance System" <mashhoodrehman99@gmail.com>',
-    to: email,
-    subject: `Low Attendance Warning - ${monthName} - AMS`,
-    html: `
+  const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -184,11 +246,14 @@ export const sendLowAttendanceEmail = async (email, studentName, attendanceRate,
         </div>
       </body>
       </html>
-    `,
-  };
+    `;
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendEmail({
+      to: email,
+      subject: `Low Attendance Warning - ${monthName} - AMS`,
+      html,
+    });
     return { success: true };
   } catch (error) {
     console.error('Error sending low attendance email:', error);
@@ -208,11 +273,7 @@ export const sendManualAttendanceEmail = async (email, studentName, summary, cus
     </tr>
   `).join('');
 
-  const mailOptions = {
-    from: '"AMS Attendance System" <mashhoodrehman99@gmail.com>',
-    to: email,
-    subject: `Attendance Status Update & Report - AMS`,
-    html: `
+  const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -308,15 +369,17 @@ export const sendManualAttendanceEmail = async (email, studentName, summary, cus
         </div>
       </body>
       </html>
-    `,
-  };
+    `;
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendEmail({
+      to: email,
+      subject: 'Attendance Status Update & Report - AMS',
+      html,
+    });
     return { success: true };
   } catch (error) {
     console.error('Error sending manual attendance email:', error);
     return { success: false, error };
   }
 };
-
