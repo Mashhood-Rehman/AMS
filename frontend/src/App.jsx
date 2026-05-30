@@ -39,7 +39,11 @@ function App() {
           localStorage.setItem('user', JSON.stringify(response.user));
         }
       } catch (error) {
-        console.error('Failed to fetch user:', error);
+        const message = error?.message || '';
+        if (message.includes('token') || message.includes('Authentication')) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
       }
     };
 

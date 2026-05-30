@@ -8,8 +8,46 @@
   "scripts": {
     "start": "electron .",
     "dev": "concurrently -n \"WEB,API,APP\" -c \"blue,green,magenta\" \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\" \"npx wait-on http://localhost:5173 && electron .\"",
-    "build": "npm run build --prefix frontend && electron-builder",
+    "build": "node scripts/prebuild-electron.js && node scripts/prepare-live-electron.js && electron-builder",
+    "build:desktop-live": "node scripts/prebuild-electron.js && node scripts/prepare-live-electron.js && electron-builder",
+    "build:desktop-bundled": "node scripts/prebuild-electron.js && node scripts/prepare-bundled-electron.js && npm run build --prefix frontend && electron-builder -c electron-builder.bundled.json",
     "postinstall": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "build": {
+    "appId": "com.ams.attendance",
+    "productName": "AMS Attendance",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "AMS-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "AMS Attendance"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Education"
+    }
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

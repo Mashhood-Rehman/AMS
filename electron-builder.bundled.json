@@ -1,0 +1,10 @@
+{
+  "extends": "./package.json",
+  "build": {
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ]
+  }
+}

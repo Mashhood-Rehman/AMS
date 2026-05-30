@@ -20,7 +20,7 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    loading || setLoading(true);
+    setLoading(true);
     setError('');
 
     try {
