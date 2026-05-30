@@ -137,8 +137,9 @@ export const forgotPassword = async (req, res) => {
       },
     });
 
-    const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-    const resetLink = `${frontendBase}/#/reset-password/${token}`;
+    // Link format for frontend: http://localhost:5173/#/reset-password/TOKEN
+    // Note: Using HashRouter on frontend, so we need the #/ component
+    const resetLink = `http://localhost:5173/#/reset-password/${token}`;
     const emailResult = await sendResetEmail(email, resetLink);
 
     if (!emailResult.success) {

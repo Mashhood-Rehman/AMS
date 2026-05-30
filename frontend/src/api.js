@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-let BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const LIVE_API_URL = 'https://ams-h6zw.onrender.com/api';
+let BASE_URL = import.meta.env.VITE_API_URL || LIVE_API_URL;
 
 if (typeof window !== 'undefined') {
   const currentHostname = window.location.hostname;
