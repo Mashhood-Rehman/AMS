@@ -85,17 +85,6 @@ const Dashboard = () => {
         bgClass: 'bg-indigo-50 text-indigo-600',
       });
     }
-
-
-    // 5. No. of Institutes (Admin only)
-    if (roleName === 'ADMIN') {
-      cards.push({
-        title: 'No. of Institutes',
-        value: stats.totalInstitutes ?? 0,
-        icon: <School size={24} />,
-        bgClass: 'bg-rose-50 text-rose-600',
-      });
-    }
   }
 
   return (

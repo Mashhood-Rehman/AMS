@@ -1,4 +1,5 @@
 import { prisma } from '../db.js';
+import { validateCoursePayload } from '../utils/validation.js';
 
 // Get all courses (with teacher info)
 export const getAllCourses = async (req, res) => {
@@ -43,8 +44,10 @@ export const createCourse = async (req, res) => {
   try {
     const { name, code, teacherId, className, days, time } = req.body;
 
-    if (!name || !code) {
-      return res.status(400).json({ success: false, message: 'Please provide name and code' });
+    const dayList = Array.isArray(days) ? days : (days ? days.split(',') : []);
+    const validationErrors = validateCoursePayload({ name, code, className, days: dayList });
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ success: false, message: validationErrors[0] });
     }
 
     // Check if course code already exists
@@ -94,6 +97,19 @@ export const updateCourse = async (req, res) => {
 
     if (!existingCourse) {
       return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    const dayList = days !== undefined
+      ? (Array.isArray(days) ? days : (days ? days.split(',') : []))
+      : existingCourse.days;
+    const validationErrors = validateCoursePayload({
+      name: name || existingCourse.name,
+      code: code || existingCourse.code,
+      className: className !== undefined ? className : existingCourse.className,
+      days: dayList,
+    });
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ success: false, message: validationErrors[0] });
     }
 
     // Check if new code conflicts with another course

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../db.js';
+import { validateUserPayload } from '../utils/validation.js';
 
 const REQUIRED_PERMISSIONS = ['dashboard', 'edit-profile'];
 
@@ -8,9 +9,12 @@ export const createUser = async (req, res) => {
   const { email, password, name, role, phone, courseIds, instituteId, permissions, className } = req.body;
 
   try {
-    // Basic validation
-    if (!email || !password || !name) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
+    const validationErrors = validateUserPayload(
+      { email, password, name, phone, role: (role || 'STUDENT').toUpperCase(), className },
+      { requirePassword: true }
+    );
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ success: false, message: validationErrors[0] });
     }
 
     // Role validation
@@ -78,6 +82,22 @@ export const updateUser = async (req, res) => {
     const validRoles = ['ADMIN', 'TEACHER', 'STUDENT'];
     if (role && !validRoles.includes(role.toUpperCase())) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+
+    const effectiveRole = (role || targetUser.role).toUpperCase();
+    const validationErrors = validateUserPayload(
+      {
+        email: email || targetUser.email,
+        password,
+        name: name || targetUser.name,
+        phone: phone !== undefined ? phone : targetUser.phone,
+        role: effectiveRole,
+        className: className !== undefined ? className : targetUser.className,
+      },
+      { requirePassword: false }
+    );
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ success: false, message: validationErrors[0] });
     }
 
     const updateData = {
@@ -276,15 +296,25 @@ export const getDashboardStats = async (req, res) => {
       stats.totalTeachers = await prisma.user.count({ where: { role: 'TEACHER' } });
       stats.totalInstitutes = await prisma.institute.count();
     } else if (role === 'TEACHER') {
-      const instituteId = user.instituteId || '';
+      const instituteId = user.instituteId || null;
+      const studentWhere = {
+        role: 'STUDENT',
+        OR: instituteId ? [
+          { instituteId },
+          { createdBy: user.id }
+        ] : [
+          { createdBy: user.id }
+        ]
+      };
+
       stats.totalStudents = await prisma.user.count({
-        where: { role: 'STUDENT', instituteId }
+        where: studentWhere
       });
       stats.activeCourses = await prisma.course.count({
         where: { teacherId: user.id }
       });
       stats.totalTeachers = await prisma.user.count({
-        where: { role: 'TEACHER', instituteId }
+        where: instituteId ? { role: 'TEACHER', instituteId } : { role: 'TEACHER' }
       });
     } else if (role === 'STUDENT') {
       const className = user.className || '';

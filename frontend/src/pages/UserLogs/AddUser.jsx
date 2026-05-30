@@ -20,6 +20,7 @@ import {
 import SearchableDropdown from '../../components/SearchableDropdown';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
 import { toast } from 'react-toastify';
+import { sanitizePhone, validateUserForm } from '../../utils/validation';
 
 const AddUser = () => {
   const { id } = useParams();
@@ -124,40 +125,22 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
     }
   };
 
- const handleInputChange = (e) => {
-  const { name, value } = e.target;
+  const clearError = (field) => {
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+  };
 
-  // Restrict phone field to numbers only
-  if (name === 'phone') {
-    const numericValue = value.replace(/\D/g, '');
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: numericValue
-    }));
-  } else {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  }
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    const nextValue = name === 'phone' ? sanitizePhone(value) : value;
 
-  if (errors[name]) {
-    setErrors(prev => ({
-      ...prev,
-      [name]: ''
-    }));
-  }
-};
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
+    clearError(name);
+  };
 
   const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name) newErrors.name = 'Full name is required';
-    if (!formData.email) newErrors.email = 'Email is required';
-    if (!isEditMode && !formData.password) newErrors.password = 'Password is required';
-    if (formData.role === 'TEACHER' && formData.courseIds.length === 0) {
-      newErrors.courses = 'Assign at least one course to the teacher';
-    }
+    const newErrors = validateUserForm(formData, { isEditMode });
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -195,7 +178,11 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
 
       const method = isEditMode ? 'put' : 'post';
 
-      const payload = { ...formData };
+      const payload = {
+        ...formData,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+      };
       if (isEditMode && !payload.password) delete payload.password;
       if (payload.role !== 'TEACHER') delete payload.courseIds;
 
@@ -228,7 +215,7 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
   );
 
   const rolePermissionMap = {
-    TEACHER: ['students', 'courses', 'reports', 'settings', 'institutes', 'attendance'],
+    TEACHER: ['students', 'reports', 'settings', 'institutes', 'attendance'],
     STUDENT: ['students', 'reports', 'institutes', 'attendance', 'courses']
   };
 
@@ -291,7 +278,11 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
               <SearchableDropdown
                 options={roleOptions}
                 value={formData.role}
-                onChange={(val) => setFormData(prev => ({ ...prev, role: val }))}
+                onChange={(val) => {
+                  setFormData((prev) => ({ ...prev, role: val }));
+                  clearError('className');
+                  clearError('courses');
+                }}
                 placeholder="Select Role"
               />
             </div>
@@ -326,10 +317,13 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
                   value={formData.phone}
                   onChange={handleInputChange}
                   type="tel"
-                  placeholder="+1 (555) 000-0000"
-                  className="custom_input"
+                  inputMode="numeric"
+                  maxLength={15}
+                  placeholder="10–15 digit number"
+                  className={`custom_input ${errors.phone ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                 />
               </div>
+              {errors.phone && <p className="text-xs text-red-500 font-bold pl-2">{errors.phone}</p>}
             </div>
 
             {/* Class Assignment (Conditional) */}
@@ -339,8 +333,12 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
                 <SearchableDropdown
                   options={instituteClasses}
                   value={formData.className}
-                  onChange={(val) => setFormData(prev => ({ ...prev, className: val }))}
+                  onChange={(val) => {
+                    setFormData((prev) => ({ ...prev, className: val }));
+                    clearError('className');
+                  }}
                   placeholder="Select Class"
+                  error={errors.className}
                 />
               </div>
             )}
@@ -389,12 +387,10 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
                <SearchableDropdown
                  options={courses}
                  value={formData.courseIds}
-                 onChange={(selected) =>
-                   setFormData(prev => ({
-                     ...prev,
-                     courseIds: selected
-                   }))
-                 }
+                 onChange={(selected) => {
+                   setFormData((prev) => ({ ...prev, courseIds: selected }));
+                   clearError('courses');
+                 }}
                  placeholder="Search and select multiple courses..."
                  isMulti={true}
                  error={errors.courses}

@@ -1,6 +1,6 @@
 import { prisma } from '../db.js';
 
-const TEACHER_ATTENDANCE_HOUR = 24
+const TEACHER_ATTENDANCE_HOUR = 12
 const TEACHER_ATTENDANCE_MINUTE = 0;
 const LATE_GRACE_MINUTES = 15;
 

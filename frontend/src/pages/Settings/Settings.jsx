@@ -11,10 +11,13 @@ import {
   Link,
 } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
+import BackupRestorePanel from '../../components/BackupRestorePanel';
 import { toast } from 'react-toastify';
 import api from '../../api';
 
 const Settings = () => {
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = currentUser.role === 'ADMIN';
   const [copiedId, setCopiedId] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -107,6 +110,9 @@ const Settings = () => {
           {configError}
         </div>
       )}
+
+      {isAdmin && <BackupRestorePanel />}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Columns: Parameters list and simple instructions */}

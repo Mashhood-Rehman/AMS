@@ -338,6 +338,24 @@ export const api = {
       throw error.response?.data || { message: 'Network error or server unavailable' };
     }
   },
+
+  exportBackup: async () => {
+    try {
+      const response = await apiInstance.get('/backup/export');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Could not create backup' };
+    }
+  },
+
+  restoreBackup: async (payload) => {
+    try {
+      const response = await apiInstance.post('/backup/restore', payload);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Could not restore backup' };
+    }
+  },
 };
 
 export default api;

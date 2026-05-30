@@ -90,6 +90,7 @@ const SearchableDropdown = ({
             <input
               type="text"
               className="w-full bg-transparent border-none outline-none p-2 text-sm text-slate-700 placeholder:text-slate-400"
+              style={{ caretColor: '#0f172a', cursor: 'text' }}
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

@@ -12,6 +12,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
+import { validateCourseForm } from '../../utils/validation';
 
 const AddCourse = ({ courseId: propCourseId, onSuccess: propOnSuccess }) => {
   const { id: paramId } = useParams();
@@ -47,7 +48,9 @@ const AddCourse = ({ courseId: propCourseId, onSuccess: propOnSuccess }) => {
 ];
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEditMode);
-const [instituteClasses] = useState(staticClasses);  const [error, setError] = useState('');
+const [instituteClasses] = useState(staticClasses);
+  const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
 
 
@@ -92,45 +95,55 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
         setDayTimes(parsedDayTimes);
       }
     } catch (err) {
-      setError('Failed to fetch course details');
+      setSubmitError('Failed to fetch course details');
     } finally {
       setFetching(false);
     }
   };
 
+  const clearError = (field) => {
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (error) setError('');
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    clearError(name);
+    if (submitError) setSubmitError('');
   };
 
   const handleDayTimeChange = (day, value) => {
-    setDayTimes(prev => ({
-      ...prev,
-      [day]: value
-    }));
-    if (error) setError('');
+    setDayTimes((prev) => ({ ...prev, [day]: value }));
+    clearError('time');
+    if (submitError) setSubmitError('');
   };
 
   const toggleDay = (day) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const days = prev.days.includes(day)
-        ? prev.days.filter(d => d !== day)
+        ? prev.days.filter((d) => d !== day)
         : [...prev.days, day];
       return { ...prev, days };
     });
-    if (error) setError('');
+    clearError('days');
+    clearError('time');
+    if (submitError) setSubmitError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.code) {
-      setError('Please fill in all mandatory fields');
+
+    const fieldErrors = validateCourseForm(formData, { useDifferentTimes, dayTimes });
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors);
       return;
     }
 
     setLoading(true);
-    setError('');
+    setSubmitError('');
+    setErrors({});
 
     try {
       const url = isEditMode
@@ -142,29 +155,16 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
       let finalTime = formData.time;
       if (useDifferentTimes && formData.days.length > 0) {
         const filteredDayTimes = {};
-        formData.days.forEach(day => {
+        formData.days.forEach((day) => {
           filteredDayTimes[day] = dayTimes[day] || '';
         });
-
-        // Validate that each active teaching day has a custom start time
-        const missingTime = formData.days.some(day => !filteredDayTimes[day]);
-        if (missingTime) {
-          setError('Please specify a start time for all selected teaching days.');
-          setLoading(false);
-          return;
-        }
-
         finalTime = JSON.stringify(filteredDayTimes);
-      } else {
-        if (!formData.time) {
-          setError('Please specify a start time.');
-          setLoading(false);
-          return;
-        }
       }
 
       const payload = {
         ...formData,
+        name: formData.name.trim(),
+        code: formData.code.trim(),
         time: finalTime,
       };
 
@@ -182,7 +182,7 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
       console.error('Course create error response:', err.response);
       console.error('Course create error object:', err);
       const msg = err.response?.data?.error || err.response?.data?.message || 'Something went wrong';
-      setError(msg);
+      setSubmitError(msg);
     } finally {
       setLoading(false);
     }
@@ -206,10 +206,10 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
             subtitle={isEditMode ? 'Modify course name and code.' : 'Register a new academic curriculum.'}
           />
 
-          {error && (
+          {submitError && (
             <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg flex items-center gap-3 text-sm font-medium animate-shake">
               <XCircle size={18} />
-              {error}
+              {submitError}
             </div>
           )}
 
@@ -231,9 +231,10 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                   value={formData.name}
                   onChange={handleInputChange}
                   placeholder="e.g. Advanced Mathematics"
-                  className="custom_input"
+                  className={`custom_input ${errors.name ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                 />
               </div>
+              {errors.name && <p className="text-xs text-red-500 font-bold pl-2">{errors.name}</p>}
             </div>
 
             {/* Course Code */}
@@ -246,9 +247,10 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                   value={formData.code}
                   onChange={handleInputChange}
                   placeholder="e.g. MATH-401"
-                  className="custom_input"
+                  className={`custom_input ${errors.code ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                 />
               </div>
+              {errors.code && <p className="text-xs text-red-500 font-bold pl-2">{errors.code}</p>}
             </div>
 
             {/* Class Assignment */}
@@ -260,7 +262,7 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                   name="className"
                   value={formData.className}
                   onChange={handleInputChange}
-                  className="custom_input pl-12 appearance-none"
+                  className={`custom_input pl-12 appearance-none ${errors.className ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                 >
                   <option value="">Select Class...</option>
                   {instituteClasses.map(c => (
@@ -272,6 +274,7 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                 </div>
               </div>
               <p className="text-[10px] text-slate-400 font-medium ml-1">This course will be visible to all students in the selected class.</p>
+              {errors.className && <p className="text-xs text-red-500 font-bold pl-2">{errors.className}</p>}
             </div>
 
             {/* Schedule Days */}
@@ -292,6 +295,7 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                   </button>
                 ))}
               </div>
+              {errors.days && <p className="text-xs text-red-500 font-bold pl-2">{errors.days}</p>}
             </div>
 
             {/* Toggle: Use different times per day */}
@@ -303,7 +307,8 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                   checked={useDifferentTimes}
                   onChange={(e) => {
                     setUseDifferentTimes(e.target.checked);
-                    if (error) setError('');
+                    clearError('time');
+                    if (submitError) setSubmitError('');
                   }}
                   className="h-4.5 w-4.5 rounded border-slate-300 text-brand-active focus:ring-brand-active cursor-pointer"
                 />
@@ -331,6 +336,7 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                   ))}
                 </div>
                 <p className="text-[10px] text-slate-400 font-medium ml-0.5">Specify a custom time for each day the class is taught.</p>
+                {errors.time && <p className="text-xs text-red-500 font-bold pl-2">{errors.time}</p>}
               </div>
             ) : (
               <div className="space-y-1.5 md:col-span-2">
@@ -341,10 +347,11 @@ const [instituteClasses] = useState(staticClasses);  const [error, setError] = u
                     name="time"
                     value={formData.time}
                     onChange={handleInputChange}
-                    className="custom_input"
+                    className={`custom_input ${errors.time ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 font-medium ml-1">Specify the time this class usually starts.</p>
+                {errors.time && <p className="text-xs text-red-500 font-bold pl-2">{errors.time}</p>}
               </div>
             )}
           </div>
