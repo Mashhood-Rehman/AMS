@@ -1,5 +1,6 @@
 import { prisma } from './db.js';
 import bcrypt from 'bcryptjs';
+import { seedInstituteClasses } from './utils/seedInstituteClasses.js';
 
 
 async function main() {
@@ -8,15 +9,27 @@ async function main() {
   const adminPassword = await bcrypt.hash('admin123', 10);
   const commonPassword = await bcrypt.hash('password123', 10);
 
+  const adminPermissions = [
+    'dashboard',
+    'institutes',
+    'attendance',
+    'students',
+    'courses',
+    'classes',
+    'reports',
+    'settings',
+    'user-logs',
+  ];
+
   const admin = await prisma.user.upsert({
     where: { email: 'admin@ams.com' },
-    update: { password: adminPassword },
+    update: { password: adminPassword, permissions: adminPermissions },
     create: {
       email: 'admin@ams.com',
       password: adminPassword,
       name: 'System Admin',
       role: 'ADMIN',
-      permissions: ['dashboard', 'institutes', 'attendance', 'students', 'courses', 'reports', 'settings', 'user-logs'],
+      permissions: adminPermissions,
     },
   });
 
@@ -38,6 +51,11 @@ async function main() {
     });
   }
 
+  const classCount = await prisma.academicClass.count({ where: { instituteId: institute.id } });
+  if (classCount === 0) {
+    await seedInstituteClasses(institute.id, institute.maxClass);
+  }
+
   // Create a Teacher
   const teacher = await prisma.user.upsert({
     where: { email: 'teacher@ams.com' },
@@ -48,7 +66,7 @@ async function main() {
       name: 'Dr. Smith',
       role: 'TEACHER',
       institute: { connect: { id: institute.id } },
-      permissions: ['dashboard', 'attendance', 'students', 'courses', 'reports'],
+      permissions: ['dashboard', 'attendance', 'students', 'courses', 'classes', 'reports'],
     },
   });
 
@@ -81,7 +99,7 @@ async function main() {
         role: 'STUDENT',
         institute: { connect: { id: institute.id } },
         permissions: ['dashboard', 'edit-profile'],
-        className: 'Class 5'
+        className: 'Class 5 - Section A'
       },
     });
 

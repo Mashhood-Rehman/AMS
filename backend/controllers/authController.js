@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../db.js';
 import crypto from 'crypto';
 import { sendResetEmail } from '../utils/emailService.js';
+import { getEffectivePermissions } from '../utils/permissions.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
@@ -62,9 +63,7 @@ export const login = async (req, res) => {
     // Generate JWT
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
 
-    const userPermissions = (user.permissions && user.permissions.length > 0)
-      ? user.permissions
-      : (user.role === 'STUDENT' ? ['dashboard', 'edit-profile'] : []);
+    const userPermissions = getEffectivePermissions(user);
 
     res.json({
       success: true,
@@ -104,11 +103,8 @@ export const getMe = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const userPermissions = (user.permissions && user.permissions.length > 0)
-      ? user.permissions
-      : (user.role === 'STUDENT' ? ['dashboard', 'edit-profile'] : []);
+    const userPermissions = getEffectivePermissions(user);
 
-    console.log('GetMe User:', user);
     res.json({ success: true, user: { ...user, permissions: userPermissions } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

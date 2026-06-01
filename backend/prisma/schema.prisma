@@ -30,16 +30,41 @@ model User {
 }
 
 model Institute {
-  id               String   @id @default(uuid())
+  id               String          @id @default(uuid())
   name             String
-  maxClass         Int      @default(0)
+  maxClass         Int             @default(0)
   address          String?
   phone            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   lmsSharedSecret  String?
   lmsAllowedDomain String?
-  users            User[]   @relation("InstituteUsers")
+  users            User[]          @relation("InstituteUsers")
+  academicClasses  AcademicClass[]
+}
+
+model AcademicClass {
+  id          String         @id @default(uuid())
+  instituteId String
+  name        String
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  institute   Institute      @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  sections    ClassSection[]
+
+  @@unique([instituteId, name])
+}
+
+model ClassSection {
+  id              String        @id @default(uuid())
+  academicClassId String
+  name            String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  academicClass   AcademicClass @relation(fields: [academicClassId], references: [id], onDelete: Cascade)
+
+  @@unique([academicClassId, name])
 }
 
 model Course {

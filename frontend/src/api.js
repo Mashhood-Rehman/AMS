@@ -213,6 +213,24 @@ export const api = {
     }
   },
 
+  getClassOptions: async (params = {}) => {
+    try {
+      const response = await apiInstance.get('/classes/options', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
+  getClasses: async (params = {}) => {
+    try {
+      const response = await apiInstance.get('/classes', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Network error or server unavailable' };
+    }
+  },
+
   getUsers: async (params = {}) => {
     try {
       const response = await apiInstance.get('/users', { params });

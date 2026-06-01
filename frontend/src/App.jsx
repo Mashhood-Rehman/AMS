@@ -16,6 +16,9 @@ import AddCourse from './pages/Courses/AddCourse';
 import AddInstitute from './pages/Institutes/AddInstitute';
 import InstitutesList from './pages/Institutes/InstitutesList';
 import StudentsList from './pages/Students/StudentsList';
+import Classes from './pages/Classes/Classes';
+import ClassesList from './pages/Classes/ClassesList';
+import AddClass from './pages/Classes/AddClass';
 
 import Attendance from './pages/Attendance/Attendance';
 import MarkAttendance from './pages/Attendance/MarkAttendance';
@@ -92,6 +95,13 @@ function App() {
               <Route path="courses-list" element={<CoursesList />} />
               <Route path="add-course" element={<AddCourse />} />
               <Route path="edit-course/:id" element={<AddCourse />} />
+            </Route>
+
+            <Route path="classes" element={<Classes />}>
+              <Route index element={<Navigate to="list" replace />} />
+              <Route path="list" element={<ClassesList />} />
+              <Route path="add" element={<AddClass />} />
+              <Route path="edit/:id" element={<AddClass />} />
             </Route>
 
             <Route path="institutes">

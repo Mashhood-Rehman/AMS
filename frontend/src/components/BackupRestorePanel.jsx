@@ -18,6 +18,8 @@ const computeSummaryFromData = (data) => {
   if (!data) return null;
   return {
     institutes: data.institutes?.length ?? 0,
+    academicClasses: data.academicClasses?.length ?? 0,
+    classSections: data.classSections?.length ?? 0,
     users: data.users?.length ?? 0,
     courses: data.courses?.length ?? 0,
     enrollments: data.enrollments?.length ?? 0,
@@ -40,6 +42,8 @@ const SummaryList = ({ summary }) => {
   if (!summary) return null;
   const items = [
     { label: 'Schools / Institutes', value: summary.institutes },
+    { label: 'Academic classes', value: summary.academicClasses },
+    { label: 'Class sections', value: summary.classSections },
     { label: 'Users', value: summary.users },
     { label: 'Courses', value: summary.courses },
     { label: 'Enrollments', value: summary.enrollments },

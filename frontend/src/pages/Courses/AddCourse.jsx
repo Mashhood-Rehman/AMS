@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
 import { validateCourseForm } from '../../utils/validation';
+import useClassOptions from '../../hooks/useClassOptions';
 
 const AddCourse = ({ courseId: propCourseId, onSuccess: propOnSuccess }) => {
   const { id: paramId } = useParams();
@@ -34,21 +35,11 @@ const AddCourse = ({ courseId: propCourseId, onSuccess: propOnSuccess }) => {
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  const staticClasses = [
-  'Class 1',
-  'Class 2',
-  'Class 3',
-  'Class 4',
-  'Class 5',
-  'Class 6',
-  'Class 7',
-  'Class 8',
-  'Class 9',
-  'Class 10',
-];
+  const { options: classOptions, loading: classesLoading } = useClassOptions();
+  const instituteClasses = classOptions.map((o) => o.value);
+
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEditMode);
-const [instituteClasses] = useState(staticClasses);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -255,7 +246,7 @@ const [instituteClasses] = useState(staticClasses);
 
             {/* Class Assignment */}
             <div className="space-y-1.5 md:col-span-2">
-              <label className="block text-sm font-bold text-slate-700 ml-1">Assigned To Class</label>
+              <label className="block text-sm font-bold text-slate-700 ml-1">Assigned To Class & Section</label>
               <div className="relative group">
                 <LayoutGrid size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-active transition-colors" />
                 <select
@@ -264,8 +255,8 @@ const [instituteClasses] = useState(staticClasses);
                   onChange={handleInputChange}
                   className={`custom_input pl-12 appearance-none ${errors.className ? 'border-red-400 focus:border-red-500 shadow-red-50' : ''}`}
                 >
-                  <option value="">Select Class...</option>
-                  {instituteClasses.map(c => (
+                  <option value="">{classesLoading ? 'Loading classes…' : 'Select class & section…'}</option>
+                  {instituteClasses.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
@@ -273,7 +264,7 @@ const [instituteClasses] = useState(staticClasses);
                   <ChevronDown size={18} />
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium ml-1">This course will be visible to all students in the selected class.</p>
+              <p className="text-[10px] text-slate-400 font-medium ml-1">This course will be visible to students in the selected class and section.</p>
               {errors.className && <p className="text-xs text-red-500 font-bold pl-2">{errors.className}</p>}
             </div>
 

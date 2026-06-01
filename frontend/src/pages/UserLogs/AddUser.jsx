@@ -21,6 +21,7 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
 import { toast } from 'react-toastify';
 import { sanitizePhone, validateUserForm } from '../../utils/validation';
+import useClassOptions from '../../hooks/useClassOptions';
 
 const AddUser = () => {
   const { id } = useParams();
@@ -50,26 +51,16 @@ const AddUser = () => {
     { id: 'attendance', label: 'Attendance' },
     { id: 'students', label: 'Students' },
     { id: 'courses', label: 'Courses' },
+    { id: 'classes', label: 'Classes' },
     { id: 'reports', label: 'Reports' },
     { id: 'settings', label: 'Settings' },
     { id: 'user-logs', label: 'User Logs' },
   ];
 
-  const staticClasses = [
-  { label: 'Class 1', value: 'Class 1' },
-  { label: 'Class 2', value: 'Class 2' },
-  { label: 'Class 3', value: 'Class 3' },
-  { label: 'Class 4', value: 'Class 4' },
-  { label: 'Class 5', value: 'Class 5' },
-  { label: 'Class 6', value: 'Class 6' },
-  { label: 'Class 7', value: 'Class 7' },
-  { label: 'Class 8', value: 'Class 8' },
-  { label: 'Class 9', value: 'Class 9' },
-  { label: 'Class 10', value: 'Class 10' },
-];
+  const { options: instituteClasses, loading: classesLoading } = useClassOptions();
 
   const [courses, setCourses] = useState([]);
-const [instituteClasses] = useState(staticClasses);  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEditMode);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -215,7 +206,7 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
   );
 
   const rolePermissionMap = {
-    TEACHER: ['students', 'reports', 'settings', 'institutes', 'attendance'],
+    TEACHER: ['students', 'reports', 'settings', 'institutes', 'attendance', 'classes'],
     STUDENT: ['students', 'reports', 'institutes', 'attendance', 'courses']
   };
 
@@ -329,9 +320,10 @@ const [instituteClasses] = useState(staticClasses);  const [loading, setLoading]
             {/* Class Assignment (Conditional) */}
             {formData.role === 'STUDENT' && (
               <div className="space-y-1">
-                <label className="block text-sm font-bold text-slate-700 ml-1">Class Assignment</label>
+                <label className="block text-sm font-bold text-slate-700 ml-1">Class & Section</label>
                 <SearchableDropdown
                   options={instituteClasses}
+                  disabled={classesLoading}
                   value={formData.className}
                   onChange={(val) => {
                     setFormData((prev) => ({ ...prev, className: val }));

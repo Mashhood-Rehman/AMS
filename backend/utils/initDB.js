@@ -1,9 +1,11 @@
 import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { migrateLegacyRoles } from './migrateLegacyRoles.js';
 
 export const initDB = async (prisma) => {
   console.log('Checking database for admin user...');
   try {
+    await migrateLegacyRoles(prisma);
     const adminExists = await prisma.user.findFirst({
       where: {
         role: Role.ADMIN

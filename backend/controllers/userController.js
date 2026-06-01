@@ -144,7 +144,12 @@ export const getAllUsers = async (req, res) => {
   try {
     const { role, courseId, instituteId: filterInstituteId, className: filterClassName } = req.query;
 
-    const requester = await prisma.user.findUnique({ where: { id: req.userId } });
+    const requesterId = parseInt(req.userId, 10);
+    const requester = await prisma.user.findUnique({ where: { id: requesterId } });
+
+    if (!requester) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
 
     const where = {};
     if (role) where.role = role.toUpperCase();
@@ -157,7 +162,10 @@ export const getAllUsers = async (req, res) => {
         where.id = requester.id;
       }
     } else if (requester.role === 'TEACHER') {
-      where.instituteId = requester.instituteId;
+      const teacherScope = requester.instituteId
+        ? { OR: [{ instituteId: requester.instituteId }, { createdBy: requesterId }] }
+        : { createdBy: requesterId };
+      where.AND = [...(where.AND || []), teacherScope];
     } else if (filterInstituteId) {
       where.instituteId = filterInstituteId;
     }

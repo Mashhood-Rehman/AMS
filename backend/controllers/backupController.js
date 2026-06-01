@@ -1,6 +1,6 @@
 import { prisma } from '../db.js';
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 const RESTORE_CONFIRM_PHRASE = 'RESTORE';
 
 const requireAdmin = (req, res) => {
@@ -31,6 +31,8 @@ const serializeRecord = (record) => {
 
 const buildSummary = (data) => ({
   institutes: data.institutes?.length ?? 0,
+  academicClasses: data.academicClasses?.length ?? 0,
+  classSections: data.classSections?.length ?? 0,
   users: data.users?.length ?? 0,
   courses: data.courses?.length ?? 0,
   enrollments: data.enrollments?.length ?? 0,
@@ -40,7 +42,7 @@ const buildSummary = (data) => ({
 });
 
 const validateBackupPayload = (backup) => {
-  if (!backup || backup.version !== BACKUP_VERSION || !backup.data) {
+  if (!backup || !backup.data || (backup.version !== 1 && backup.version !== BACKUP_VERSION)) {
     return 'This file is not a valid AMS backup.';
   }
   const { institutes, users, courses, enrollments, attendance, teacherAttendance, alerts } =
@@ -76,6 +78,8 @@ const clearAllData = async (tx) => {
   await tx.enrollment.deleteMany();
   await tx.course.deleteMany();
   await tx.user.deleteMany();
+  await tx.classSection.deleteMany();
+  await tx.academicClass.deleteMany();
   await tx.institute.deleteMany();
 };
 
@@ -85,19 +89,32 @@ export const exportBackup = async (req, res) => {
   try {
     if (!requireAdmin(req, res)) return;
 
-    const [institutes, users, courses, enrollments, attendance, teacherAttendance, alerts] =
-      await Promise.all([
-        prisma.institute.findMany(),
-        prisma.user.findMany(),
-        prisma.course.findMany(),
-        prisma.enrollment.findMany(),
-        prisma.attendance.findMany(),
-        prisma.teacherAttendance.findMany(),
-        prisma.alert.findMany(),
-      ]);
+    const [
+      institutes,
+      academicClasses,
+      classSections,
+      users,
+      courses,
+      enrollments,
+      attendance,
+      teacherAttendance,
+      alerts,
+    ] = await Promise.all([
+      prisma.institute.findMany(),
+      prisma.academicClass.findMany(),
+      prisma.classSection.findMany(),
+      prisma.user.findMany(),
+      prisma.course.findMany(),
+      prisma.enrollment.findMany(),
+      prisma.attendance.findMany(),
+      prisma.teacherAttendance.findMany(),
+      prisma.alert.findMany(),
+    ]);
 
     const data = {
       institutes: serializeRecord(institutes),
+      academicClasses: serializeRecord(academicClasses),
+      classSections: serializeRecord(classSections),
       users: serializeRecord(users),
       courses: serializeRecord(courses),
       enrollments: serializeRecord(enrollments),
@@ -151,6 +168,8 @@ export const restoreBackup = async (req, res) => {
 
     const {
       institutes,
+      academicClasses = [],
+      classSections = [],
       users,
       courses,
       enrollments,
@@ -175,6 +194,31 @@ export const restoreBackup = async (req, res) => {
               lmsAllowedDomain: institute.lmsAllowedDomain ?? null,
               createdAt: toDate(institute.createdAt),
               updatedAt: toDate(institute.updatedAt),
+            },
+          });
+        }
+
+        for (const academicClass of academicClasses) {
+          await tx.academicClass.create({
+            data: {
+              id: academicClass.id,
+              instituteId: academicClass.instituteId,
+              name: academicClass.name,
+              sortOrder: academicClass.sortOrder ?? 0,
+              createdAt: toDate(academicClass.createdAt),
+              updatedAt: toDate(academicClass.updatedAt),
+            },
+          });
+        }
+
+        for (const section of classSections) {
+          await tx.classSection.create({
+            data: {
+              id: section.id,
+              academicClassId: section.academicClassId,
+              name: section.name,
+              createdAt: toDate(section.createdAt),
+              updatedAt: toDate(section.updatedAt),
             },
           });
         }

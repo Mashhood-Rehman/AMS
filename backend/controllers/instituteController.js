@@ -1,4 +1,5 @@
 import { prisma } from '../db.js';
+import { seedInstituteClasses } from '../utils/seedInstituteClasses.js';
 
 // Create Institute
 export const createInstitute = async (req, res) => {
@@ -9,14 +10,17 @@ export const createInstitute = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Name and max class are required' });
     }
 
+    const parsedMaxClass = parseInt(maxClass, 10);
     const institute = await prisma.institute.create({
       data: {
         name,
-        maxClass: parseInt(maxClass),
+        maxClass: parsedMaxClass,
         address,
         phone
       }
     });
+
+    await seedInstituteClasses(institute.id, parsedMaxClass);
 
     res.status(201).json({
       success: true,

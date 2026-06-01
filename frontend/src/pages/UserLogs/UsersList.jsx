@@ -1,34 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
 import CustomTable from '../../components/constantComponents/CustomTable';
 import Icons from '../../assets/icons';
 
 const UsersList = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/users`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.data.success) {
-        setUsers(response.data.users);
+        setUsers(response.data.users || []);
+      } else {
+        const message = response.data.message || 'Could not load users';
+        setFetchError(message);
+        toast.error(message);
       }
     } catch (error) {
+      const message = error.response?.data?.message || 'Failed to load users';
+      setFetchError(message);
+      toast.error(message);
       console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers, location.pathname]);
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
@@ -103,12 +114,23 @@ const UsersList = () => {
         title="Users Management"
         subtitle="Manage system users, access levels, and role assignments."
         button={
-          <button
-            onClick={() => navigate('/dashboard/user-logs/add-user')}
-            className="btn btn-blue"
-          >
-            Add User
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={fetchUsers}
+              className="btn btn-cancel"
+              disabled={loading}
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/user-logs/add-user')}
+              className="btn btn-blue"
+            >
+              Add User
+            </button>
+          </div>
         }
       />
 
@@ -123,7 +145,14 @@ const UsersList = () => {
             <div className="p-4 bg-white rounded-lg shadow-sm mb-2">
               <Icons.Users size={32} className="text-slate-300" />
             </div>
-            <p className="text-slate-500 font-medium">No users found in the system.</p>
+            <p className="text-slate-500 font-medium">
+              {fetchError || 'No users found in the system.'}
+            </p>
+            {fetchError && (
+              <button type="button" onClick={fetchUsers} className="btn btn-blue text-sm mt-2">
+                Try again
+              </button>
+            )}
           </div>
         ) : (
           <CustomTable

@@ -8,7 +8,8 @@ import {
   History,
   BookOpen,
   Building2,
-  User
+  User,
+  GraduationCap
 } from 'lucide-react';
 
 export const navItems = [
@@ -33,6 +34,17 @@ export const navItems = [
     subTabs: [
       { title: 'Courses List', path: '/dashboard/courses/courses-list' },
       { title: 'Add Course', path: '/dashboard/courses/add-course' },
+    ]
+  },
+  {
+    title: 'Classes',
+    icon: <GraduationCap size={20} />,
+    path: '/dashboard/classes',
+    permissionKey: 'classes',
+    hideForRoles: ['STUDENT'],
+    subTabs: [
+      { title: 'All Classes', path: '/dashboard/classes/list' },
+      { title: 'Add Class', path: '/dashboard/classes/add' },
     ]
   },
   { title: 'Attendance', icon: <ClipboardCheck size={20} />, path: '/dashboard/attendance', permissionKey: 'attendance' },

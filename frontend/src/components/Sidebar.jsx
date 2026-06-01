@@ -25,6 +25,10 @@ const Sidebar = ({ isSidebarOpen }) => {
         return true;
       }
 
+      if (role === 'ADMIN') {
+        return true;
+      }
+
       return userPermissions.includes(item.permissionKey);
     })
     .map((item) => {
@@ -40,6 +44,13 @@ const Sidebar = ({ isSidebarOpen }) => {
           return {
             ...item,
             subTabs: item.subTabs?.filter(sub => sub.path !== '/dashboard/courses/add-course') || []
+          };
+        }
+
+        if (item.permissionKey === 'classes') {
+          return {
+            ...item,
+            subTabs: item.subTabs?.filter(sub => sub.path !== '/dashboard/classes/add') || []
           };
         }
       }
