@@ -15,3 +15,25 @@ export function normalizeSectionName(name) {
 export function normalizeClassName(name) {
   return String(name || '').trim();
 }
+
+/** Base grade label from a full class+section value (e.g. "Class 5 - Section A" → "Class 5"). */
+export function getBaseClassName(classLabel) {
+  const trimmed = String(classLabel || '').trim();
+  if (!trimmed) return '';
+  const dash = trimmed.indexOf(' - ');
+  return dash === -1 ? trimmed : trimmed.slice(0, dash).trim();
+}
+
+/** Prisma where clause: match courses for a class dropdown value (exact, legacy base, or section variants). */
+export function buildCourseClassNameWhere(classLabel) {
+  const trimmed = String(classLabel || '').trim();
+  if (!trimmed) return null;
+  const baseClass = getBaseClassName(trimmed);
+  return {
+    OR: [
+      { className: trimmed },
+      { className: baseClass },
+      { className: { startsWith: `${baseClass} -` } },
+    ],
+  };
+}

@@ -1,5 +1,5 @@
 import { prisma } from '../db.js';
-import { seedInstituteClasses } from '../utils/seedInstituteClasses.js';
+import { seedInstituteClasses, syncMissingNumberedClasses } from '../utils/seedInstituteClasses.js';
 import {
   formatClassSectionName,
   normalizeClassName,
@@ -33,16 +33,20 @@ const classInclude = {
 };
 
 const ensureInstituteClasses = async (instituteId) => {
-  const count = await prisma.academicClass.count({ where: { instituteId } });
-  if (count > 0) return;
-
   const institute = await prisma.institute.findUnique({
     where: { id: instituteId },
     select: { maxClass: true },
   });
-  if (institute?.maxClass > 0) {
-    await seedInstituteClasses(instituteId, institute.maxClass);
+  const maxClass = institute?.maxClass || 0;
+  if (maxClass <= 0) return;
+
+  const count = await prisma.academicClass.count({ where: { instituteId } });
+  if (count === 0) {
+    await seedInstituteClasses(instituteId, maxClass);
+    return;
   }
+
+  await syncMissingNumberedClasses(instituteId, maxClass);
 };
 
 const mapClassResponse = (academicClass) => ({

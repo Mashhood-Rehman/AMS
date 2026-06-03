@@ -47,12 +47,6 @@ const Sidebar = ({ isSidebarOpen }) => {
           };
         }
 
-        if (item.permissionKey === 'classes') {
-          return {
-            ...item,
-            subTabs: item.subTabs?.filter(sub => sub.path !== '/dashboard/classes/add') || []
-          };
-        }
       }
       return item;
     });

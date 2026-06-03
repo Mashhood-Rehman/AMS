@@ -1,5 +1,5 @@
 import { prisma } from '../db.js';
-import { seedInstituteClasses } from '../utils/seedInstituteClasses.js';
+import { seedInstituteClasses, syncMissingNumberedClasses } from '../utils/seedInstituteClasses.js';
 
 // Create Institute
 export const createInstitute = async (req, res) => {
@@ -101,10 +101,21 @@ export const updateInstitute = async (req, res) => {
       phone
     };
 
+    const previous = await prisma.institute.findUnique({
+      where: { id },
+      select: { maxClass: true },
+    });
+
     const institute = await prisma.institute.update({
       where: { id },
       data: updateData
     });
+
+    const newMax = institute.maxClass ?? 0;
+    const oldMax = previous?.maxClass ?? 0;
+    if (newMax > oldMax && newMax > 0) {
+      await syncMissingNumberedClasses(id, newMax);
+    }
 
     res.json({ success: true, institute });
   } catch (error) {

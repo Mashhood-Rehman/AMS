@@ -23,3 +23,37 @@ export async function seedInstituteClasses(instituteId, maxClass, { tx } = {}) {
   }
   return created;
 }
+
+/** Add any missing numbered classes (Class 1 … maxClass) after maxClass is raised. */
+export async function syncMissingNumberedClasses(instituteId, maxClass, { tx } = {}) {
+  const client = tx || prisma;
+  const limit = Math.max(0, parseInt(maxClass, 10) || 0);
+  if (!instituteId || limit === 0) return [];
+
+  const existing = await client.academicClass.findMany({
+    where: { instituteId },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map((row) => row.name));
+
+  const created = [];
+  for (let i = 1; i <= limit; i += 1) {
+    const name = `Class ${i}`;
+    if (existingNames.has(name)) continue;
+
+    const academicClass = await client.academicClass.create({
+      data: {
+        instituteId,
+        name,
+        sortOrder: i,
+        sections: {
+          create: [{ name: 'A' }],
+        },
+      },
+      include: { sections: true },
+    });
+    created.push(academicClass);
+    existingNames.add(name);
+  }
+  return created;
+}

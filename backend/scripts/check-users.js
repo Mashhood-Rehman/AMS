@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import { prisma } from '../db.js';
+import { migrateLegacyRoles } from '../utils/migrateLegacyRoles.js';
+
+await migrateLegacyRoles(prisma);
 
 try {
   const users = await prisma.user.findMany({

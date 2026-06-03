@@ -19,6 +19,7 @@ import {
   Mail
 } from 'lucide-react';
 import SectionHeader from '../../components/constantComponents/SectionHeader';
+import useClassOptions from '../../hooks/useClassOptions';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -78,6 +79,24 @@ const parseLocalDate = (dateStr) => {
   return new Date(y, m - 1, d);
 };
 
+// Use local calendar date for ISO timestamps (avoids UTC date-only slice shifting createdAt)
+const parseInstantAsLocalDate = (isoStr) => {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+};
+
+const formatLocalDate = (date) => {
+  if (!date) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getTodayLocal = () => formatLocalDate(new Date());
+
 const countExpectedClasses = (courseDays, startStr, endStr) => {
   if (!courseDays || !courseDays.length || !startStr || !endStr) return 0;
 
@@ -113,7 +132,8 @@ const countExpectedClasses = (courseDays, startStr, endStr) => {
 
 const Reports = () => {
   const [courses, setCourses] = useState([]);
-  const [classes, setClasses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const { options: classOptions, loading: classesLoading, error: classesError } = useClassOptions();
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
 
@@ -219,28 +239,48 @@ const Reports = () => {
   const isStudent = loggedInUser?.role === 'STUDENT';
   const studentClass = isStudent ? (loggedInUser?.className || null) : null;
 
-  // Load courses and classes on component mount
   useEffect(() => {
-    const loadOptions = async () => {
+    if (isStudent && studentClass) {
+      setSelectedClass(studentClass);
+    }
+  }, [isStudent, studentClass]);
+
+  // Load subjects for the selected class (matches legacy "Class 5" and full "Class 5 - Section A" labels)
+  useEffect(() => {
+    if (!selectedClass) {
+      setCourses([]);
+      setSelectedCourse('');
+      return;
+    }
+
+    let cancelled = false;
+    const loadCoursesForClass = async () => {
+      setCoursesLoading(true);
       try {
-        const coursesResponse = await api.getCourses();
-        setCourses(coursesResponse.courses || []);
-
-        if (isStudent) {
-          setSelectedClass(studentClass || '');
-          return;
+        const coursesResponse = await api.getCourses({ className: selectedClass });
+        if (cancelled) return;
+        if (coursesResponse.success) {
+          setCourses(coursesResponse.courses || []);
+        } else {
+          setCourses([]);
         }
-
-        // Admins and teachers should always see 10 fixed class options
-        setClasses(Array.from({ length: 10 }, (_, idx) => `Class ${idx + 1}`));
+        setSelectedCourse('');
       } catch (err) {
-        console.error('Failed to load report options:', err);
-        setError('Failed to load filter choices. Please refresh.');
+        if (!cancelled) {
+          console.error('Failed to load subjects:', err);
+          setCourses([]);
+          setError(err?.message || 'Failed to load subjects for this class.');
+        }
+      } finally {
+        if (!cancelled) setCoursesLoading(false);
       }
     };
 
-    loadOptions();
-  }, []);
+    loadCoursesForClass();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedClass]);
 
   // Set default dates/month on reportType changes
   useEffect(() => {
@@ -367,26 +407,28 @@ const Reports = () => {
       recordsMap[rec.studentId][getLocalDateKey(rec.date)] = rec;
     });
 
-    // Resolve active date range
     const activeStart = reportType === 'daily' ? singleDate : startDate;
     const activeEnd = reportType === 'daily' ? singleDate : endDate;
-
-    // Get course days and clamp expected sessions by course creation date
+    const today = getTodayLocal();
     const courseObj = courses.find(c => String(c.id) === String(selectedCourse));
     const courseDays = courseObj?.days || [];
-    const courseCreatedDate = courseObj?.createdAt ? parseLocalDate(courseObj.createdAt) : null;
-    const reportStartDate = parseLocalDate(activeStart);
-    const reportEndDate = parseLocalDate(activeEnd);
-    let effectiveStartDate = reportStartDate;
 
-    if (courseCreatedDate && reportStartDate && courseCreatedDate > reportStartDate) {
-      effectiveStartDate = courseCreatedDate;
+    // Simple expected count: use session dates from this report, else count scheduled days since course was created
+    let expectedClasses = uniqueDates.length;
+
+    if (expectedClasses === 0 && courseDays.length) {
+      let startStr = activeStart;
+      let endStr = activeEnd > today ? today : activeEnd;
+
+      if (courseObj?.createdAt) {
+        const createdStr = formatLocalDate(parseInstantAsLocalDate(courseObj.createdAt));
+        if (createdStr && createdStr > startStr) startStr = createdStr;
+      }
+
+      if (startStr && endStr && startStr <= endStr) {
+        expectedClasses = countExpectedClasses(courseDays, startStr, endStr);
+      }
     }
-
-    const expectedClasses =
-      courseDays.length && effectiveStartDate && reportEndDate && (!courseCreatedDate || courseCreatedDate <= reportEndDate)
-        ? countExpectedClasses(courseDays, effectiveStartDate.toISOString().split('T')[0], activeEnd)
-        : 0;
 
     // Generate stats for each student
     const studentStats = students.map(student => {
@@ -555,10 +597,23 @@ const Reports = () => {
     const courseName = courseObj ? courseObj.name : 'Subject';
     const dates = processedData.uniqueDates;
 
-    // Build headers
-    const headers = ['Student Name', 'Email', 'Class', ...dates.map(d => formatDateLabel(d)), 'Present', 'Absent', 'Total Days', 'Attendance Rate (%)'];
+    // Static institution info
+    const INSTITUTE_NAME = 'Institute of Education and Research (IER)';
+    const DEPARTMENT_NAME = 'Technology Education';
 
-    // Build rows
+    // Meta info rows (shown once at the top)
+    const metaRows = [
+      `"Institute:","${INSTITUTE_NAME}"`,
+      `"Department:","${DEPARTMENT_NAME}"`,
+      `"Course:","${courseName}"`,
+      `"Class:","${selectedClass}"`,
+      ``
+    ];
+
+    // Build headers (no Class column — it's in the meta header above)
+    const headers = ['Student Name', 'Email', ...dates.map(d => formatDateLabel(d)), 'Present', 'Absent', 'Total Days', 'Attendance Rate (%)'];
+
+    // Build rows (no Class column per row)
     const rows = filteredStudentStats.map(student => {
       const dateRecords = dates.map(date => {
         const record = student.records[date];
@@ -568,7 +623,6 @@ const Reports = () => {
       return [
         student.name,
         student.email,
-        selectedClass,
         ...dateRecords,
         student.present,
         student.absent,
@@ -578,6 +632,7 @@ const Reports = () => {
     });
 
     const csvContent = [
+      ...metaRows,
       headers.join(','),
       ...rows.map(row => row.map(val => `"${val}"`).join(','))
     ].join('\n');
@@ -778,10 +833,13 @@ const Reports = () => {
           </div>
           <div style={{ textAlign: 'right' }}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
-              AMS Attendance System
+              Institute of Education and Research (IER)
             </h2>
-            <p style={{ fontSize: '11px', color: '#64748b', margin: 0, fontWeight: '500' }}>
-              Institution Management Portal
+            <p style={{ fontSize: '12px', color: '#334155', margin: '2px 0 0', fontWeight: '600' }}>
+              Department of Technology Education
+            </p>
+            <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0', fontWeight: '500' }}>
+              Attendance Management System
             </p>
           </div>
         </div>
@@ -821,16 +879,27 @@ const Reports = () => {
                 {studentClass || 'No class assigned'}
               </div>
             ) : (
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                style={{ width: '100%', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', padding: '8px 12px', fontSize: '14px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+            <select
+              value={selectedClass}
+              onChange={(e) => {
+                setSelectedClass(e.target.value);
+                setSelectedCourse('');
+              }}
+              disabled={classesLoading}
+                style={{ width: '100%', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', padding: '8px 12px', fontSize: '14px', color: '#1e293b', outline: 'none', cursor: classesLoading ? 'wait' : 'pointer' }}
               >
-                <option value="">Select class</option>
-                {classes.map((className) => (
-                  <option key={className} value={className}>{className}</option>
+                <option value="">
+                  {classesLoading
+                    ? 'Loading classes…'
+                    : classesError || 'Select class & section…'}
+                </option>
+                {classOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+            )}
+            {!isStudent && classesError && !classesLoading && (
+              <p style={{ fontSize: '11px', color: '#dc2626', margin: 0 }}>{classesError}</p>
             )}
           </div>
 
@@ -840,9 +909,18 @@ const Reports = () => {
             <select
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
-              style={{ width: '100%', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', padding: '8px 12px', fontSize: '14px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+              disabled={!selectedClass || coursesLoading}
+              style={{ width: '100%', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', padding: '8px 12px', fontSize: '14px', color: '#1e293b', outline: 'none', cursor: !selectedClass || coursesLoading ? 'not-allowed' : 'pointer', opacity: !selectedClass || coursesLoading ? 0.7 : 1 }}
             >
-              <option value="">Select subject</option>
+              <option value="">
+                {!selectedClass
+                  ? 'Select class first…'
+                  : coursesLoading
+                    ? 'Loading subjects…'
+                    : courses.length === 0
+                      ? 'No subjects for this class'
+                      : 'Select subject…'}
+              </option>
               {courses.map((course) => (
                 <option key={course.id} value={course.id}>{course.name} ({course.code})</option>
               ))}
@@ -1037,7 +1115,7 @@ const Reports = () => {
               <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#0f172a' }}>{overviewStats.expected}</span>
               <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '500' }}>classes</span>
             </div>
-            <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '500', marginTop: '4px', marginBottom: 0 }}>based on course schedule</p>
+            <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '500', marginTop: '4px', marginBottom: 0 }}>elapsed since course creation</p>
           </div>
 
           {/* At-Risk Students */}

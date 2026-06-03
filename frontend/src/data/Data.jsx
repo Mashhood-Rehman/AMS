@@ -41,7 +41,7 @@ export const navItems = [
     icon: <GraduationCap size={20} />,
     path: '/dashboard/classes',
     permissionKey: 'classes',
-    hideForRoles: ['STUDENT'],
+    hideForRoles: ['TEACHER', 'STUDENT'],
     subTabs: [
       { title: 'All Classes', path: '/dashboard/classes/list' },
       { title: 'Add Class', path: '/dashboard/classes/add' },
@@ -51,5 +51,11 @@ export const navItems = [
   { title: 'Students', icon: <Users size={20} />, path: '/dashboard/students', permissionKey: 'students', hideForRoles: ['TEACHER'] },
   { title: 'Reports', icon: <FileText size={20} />, path: '/dashboard/reports', permissionKey: 'reports' },
   { title: 'Edit Profile', icon: <User size={20} />, path: '/dashboard/profile', permissionKey: 'edit-profile' },
-  { title: 'Settings', icon: <Settings size={20} />, path: '/dashboard/settings', permissionKey: 'settings' },
+  {
+    title: 'Settings',
+    icon: <Settings size={20} />,
+    path: '/dashboard/settings',
+    permissionKey: 'settings',
+    hideForRoles: ['TEACHER', 'STUDENT'],
+  },
 ];

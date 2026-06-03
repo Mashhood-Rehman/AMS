@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import { validateCoursePayload } from '../utils/validation.js';
+import { buildCourseClassNameWhere } from '../utils/classSection.js';
 
 // Get all courses (with teacher info)
 export const getAllCourses = async (req, res) => {
@@ -10,7 +11,8 @@ export const getAllCourses = async (req, res) => {
     const where = {};
 
     if (className) {
-      where.className = className;
+      const classFilter = buildCourseClassNameWhere(className);
+      if (classFilter) Object.assign(where, classFilter);
     } else if (requester?.role === 'STUDENT') {
       const orFilters = [];
       if (requester.className) {
