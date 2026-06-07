@@ -1,33 +1,15 @@
-import { Role } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { migrateLegacyRoles } from './migrateLegacyRoles.js';
+import { ensureTables, ensureAdmin } from './ensureDatabase.js';
 
 export const initDB = async (prisma) => {
-  console.log('Checking database for admin user...');
+  console.log('Initializing database...');
   try {
+    await ensureTables(prisma);
     await migrateLegacyRoles(prisma);
-    const adminExists = await prisma.user.findFirst({
-      where: {
-        role: Role.ADMIN
-      }
-    });
-
-    if (!adminExists) {
-      console.log('No admin user found. Creating default admin...');
-      const hashedPassword = await bcrypt.hash('admin123', 10);
-      await prisma.user.create({
-        data: {
-          email: 'admin@ams.com',
-          password: hashedPassword,
-          name: 'System Admin',
-          role: Role.ADMIN
-        }
-      });
-      console.log('Default admin user created successfully.');
-    } else {
-      console.log('Admin user already exists.');
-    }
+    await ensureAdmin(prisma);
+    console.log('Database initialization complete.');
   } catch (error) {
-    console.error('Error initializing database:', error);
+    console.error('Database initialization failed:', error);
+    throw error;
   }
 };

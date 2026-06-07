@@ -4,22 +4,27 @@ const LIVE_API_URL = 'https://ams-h6zw.onrender.com/api';
 let BASE_URL = import.meta.env.VITE_API_URL || LIVE_API_URL;
 
 if (typeof window !== 'undefined') {
-  const currentHostname = window.location.hostname;
-  const isLocal = currentHostname === 'localhost' || currentHostname === '127.0.0.1';
-  const devIP = import.meta.env.VITE_DEV_IP;
+  if (window.electronAPI?.getApiUrl) {
+    BASE_URL = window.electronAPI.getApiUrl();
+  } else {
+    const currentHostname = window.location.hostname;
+    const isLocal = currentHostname === 'localhost' || currentHostname === '127.0.0.1';
+    const isElectronFile = window.location.protocol === 'file:';
+    const devIP = import.meta.env.VITE_DEV_IP;
 
-  try {
-    const url = new URL(BASE_URL);
-    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-      if (!isLocal) {
-        url.hostname = currentHostname;
-      } else if (devIP && devIP !== 'localhost') {
-        url.hostname = devIP;
+    try {
+      const url = new URL(BASE_URL);
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+        if (!isLocal && !isElectronFile) {
+          url.hostname = currentHostname;
+        } else if (isLocal && devIP && devIP !== 'localhost') {
+          url.hostname = devIP;
+        }
+        BASE_URL = url.toString();
       }
-      BASE_URL = url.toString();
+    } catch (e) {
+      console.error('Failed to parse BASE_URL', e);
     }
-  } catch (e) {
-    console.error('Failed to parse BASE_URL', e);
   }
 }
 

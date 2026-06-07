@@ -32,7 +32,16 @@ app.use('/api/backup', backupRoutes);
 app.use('/api/classes', classRoutes);
 
 
-app.listen(PORT, async () => {
-  console.log(`AMS Backend server running on port ${PORT}`);
-  await initDB(prisma);
-});
+const startServer = async () => {
+  try {
+    await initDB(prisma);
+    app.listen(PORT, () => {
+      console.log(`AMS Backend server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
